@@ -8,6 +8,8 @@ void print_char(char c, ui32 posx, ui32 posy, ui32 color) {
         for (int col = 0; col < 8; col++) {
             if (font_ASC16[row + index_begin] & (1 << col)) {
                 draw_pixel(posx + 8 - col, posy + row, color);
+            } else {
+                draw_pixel(posx + 8 - col, posy + row, 0);
             }
         }
     }
