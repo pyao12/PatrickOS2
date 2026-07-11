@@ -218,6 +218,25 @@ static void cmd_run(const char *arg) {
     if (!program_run(path)) write_console("run: cannot load program\n", COLOR_RED);
 }
 
+static bool run_program_command(const char *cmd, const char *arg) {
+    char path[max_path_len];
+    str_copy(path, "/programs/", max_path_len);
+
+    ui32 pos = str_len(path);
+    for (ui32 index = 0; cmd[index] && pos + 5 < max_path_len; index++) {
+        path[pos++] = cmd[index];
+    }
+    path[pos++] = '.';
+    path[pos++] = 'e';
+    path[pos++] = 'l';
+    path[pos++] = 'f';
+    path[pos] = 0;
+
+    fat32_file_t file;
+    if (!fat32_open(path, &file)) return false;
+    return program_run(path, arg);
+}
+
 static void parse_and_exec(char *cmd) {
     while (*cmd == ' ') cmd++;
     ui32 len = str_len(cmd);
@@ -249,6 +268,7 @@ static void parse_and_exec(char *cmd) {
         cmd_run(arg);
     } else if (str_eq(cmd, "clear")) {
         cmd_clear();
+    } else if (run_program_command(cmd, arg)) {
     } else {
         write_console(cmd, COLOR_RED);
         write_console(": command not found\n", COLOR_RED);
