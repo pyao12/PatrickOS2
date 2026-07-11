@@ -2,6 +2,7 @@
 #include <graphics/basic.h>
 #include <graphics/font.h>
 #include <console.h>
+#include <memory.h>
 #include <scheduler.h>
 
 #include <algo/convert.h>
@@ -41,6 +42,21 @@ extern "C" void kernel_main(ui32 mb_info_addr) {
     // 函数设置为 extern "C" 是因为 boot.s 使用 clang 编译，需要提供C兼容接口调用
     mb_info_t *mb_info = (mb_info_t *) (uip) mb_info_addr;
     graphics_init(mb_info);
+    memory_init(mb_info);
+
+    ui64 *memory_test = new ui64;
+    *memory_test = 0x504f5332ULL;
+    if (*memory_test != 0x504f5332ULL) halt();
+    delete memory_test;
+
+    ui8 *memory_test_array = new ui8[8192];
+    for (ui32 index = 0; index < 8192; index++) {
+        memory_test_array[index] = (ui8) index;
+    }
+    for (ui32 index = 0; index < 8192; index++) {
+        if (memory_test_array[index] != (ui8) index) halt();
+    }
+    delete[] memory_test_array;
 
     scheduler_init();
     if (scheduler_create_task(console_main, 0) < 0) halt();

@@ -4,11 +4,11 @@ ASC  := clang
 LD   := ld.lld
 
 _FLAGS_COMMON := -m64 -fno-pic -fno-pie -nostdlib
-FLAGS_CPP     := $(_FLAGS_COMMON) -ffreestanding -mno-red-zone -fcf-protection=none -Wall -Wextra -I./include/
+FLAGS_CPP     := $(_FLAGS_COMMON) -ffreestanding -fno-exceptions -mno-red-zone -fcf-protection=none -Wall -Wextra -I./include/
 FLAGS_AS      := $(_FLAGS_COMMON)
 FLAGS_LD      := -m elf_x86_64 -T linker.ld
 
-FLAGS_QEMU := -serial stdio
+FLAGS_QEMU := -serial stdio --no-reboot
 
 BUILD_DIR        := build
 PARTITION_OFFSET := 2048
@@ -57,7 +57,7 @@ $(BUILD_DIR)/pos2.img: $(BUILD_DIR)/kernel.elf
 
 run: $(BUILD_DIR)/pos2.img
 	@echo "\033[36m[Other]\033[0m Launching QEMU..."
-	@qemu-system-x86_64 -drive format=raw,file=$(BUILD_DIR)/pos2.img $(QEMUFLAGS)
+	@qemu-system-x86_64 -drive format=raw,file=$(BUILD_DIR)/pos2.img $(QEMUFLAGS) 
 
 clean:
 	@echo "Cleaning old files..."
