@@ -42,7 +42,7 @@ $(BUILD_DIR)/pos2.img: $(BUILD_DIR)/kernel.elf
 	@mkdir -p $(BUILD_DIR)/grub
 	@dd if=/dev/zero of=$@ bs=1M count=64 status=none
 	@printf "label: dos\nstart=$(PARTITION_OFFSET), type=c\n" | sfdisk $@ >/dev/null
-	@mkfs.fat -F 32 --offset=$(PARTITION_OFFSET) $@
+	@mkfs.fat -F 32 --offset=$(PARTITION_OFFSET) $@ >/dev/null
 
 	@rm -rf $(BUILD_DIR)/grubroot
 	@mkdir -p $(BUILD_DIR)/grubroot/boot/grub

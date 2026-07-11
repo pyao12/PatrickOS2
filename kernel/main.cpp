@@ -1,8 +1,10 @@
 #include <common.h>
 #include <graphics/basic.h>
 #include <graphics/font.h>
-#include <console-entry.h>
+#include <console.h>
 #include <scheduler.h>
+
+#include <algo/convert.h>
 
 #define screen_width  1280
 #define screen_height 768
@@ -10,7 +12,13 @@
 void taska(void *arg) {
     (void) arg;
     for (int i = 1; i <= 100000; i++) {
-        print_char((char) ('0' + i % 10), 20, 20, 0x00ffffff);
+        // print_char((char) ('0' + i % 10), 20, 20, 0x00ffffff);
+        if (i % 10000 == 0) {
+            char buffer[21];
+            write_console("Task A: Count");
+            write_console(int2str(i / 10000, buffer));
+            write_console("\n");
+        }
         scheduler_yield();
     }
 }
@@ -18,7 +26,13 @@ void taska(void *arg) {
 void taskb(void *arg) {
     (void) arg;
     for (int i = 1; i <= 100000; i++) {
-        print_char((char) ('0' + i % 10), 20, 50, 0x00ffffff);
+        // print_char((char) ('0' + i % 10), 20, 50, 0x00ffffff);
+        if (i % 10000 == 0) {
+            char buffer[21];
+            write_console("Task B: Count");
+            write_console(int2str(i / 10000, buffer));
+            write_console("\n");
+        }
         scheduler_yield();
     }
 }
