@@ -10,7 +10,7 @@ FLAGS_LD      := -m elf_x86_64 -T linker.ld
 FLAGS_PROGRAM := $(FLAGS_CPP) -fpie -fno-rtti -fno-stack-protector -mgeneral-regs-only
 FLAGS_PROGRAM_LD := -m elf_x86_64 -pie --no-dynamic-linker -T program.ld
 
-QEMUFLAGS ?= -serial stdio --no-reboot -m 2048
+QEMUFLAGS ?= -monitor stdio --no-reboot -m 2048 
 
 BUILD_DIR        := build
 PARTITION_OFFSET := 2048

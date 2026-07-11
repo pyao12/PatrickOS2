@@ -169,7 +169,7 @@ static ui8 *find_bitmap_storage(const mb_info_t *mb_info, ui64 bitmap_size) {
     return 0;
 }
 
-static void *alloc_pages(ui64 count) {
+void *memory_alloc_pages(ui64 count) {
     if (!memory_ready || count == 0 || count > page_count) return 0;
 
     ui64 consecutive = 0;
@@ -192,7 +192,7 @@ static void *alloc_pages(ui64 count) {
     return 0;
 }
 
-static void free_pages(void *address, ui64 count) {
+void memory_free_pages(void *address, ui64 count) {
     ui64 start = (ui64) (uip) address;
     if (!memory_ready || address == 0 || count == 0 || (start & page_mask) != 0 ||
         start >= physical_memory_limit || count > (physical_memory_limit - start) / page_size) {
@@ -211,7 +211,7 @@ static void *kmalloc(uip size) {
 
     uip total_size = size + sizeof(allocation_header_t);
     ui64 pages = (total_size + page_mask) / page_size;
-    allocation_header_t *header = (allocation_header_t *) alloc_pages(pages);
+    allocation_header_t *header = (allocation_header_t *) memory_alloc_pages(pages);
     if (header == 0) return 0;
 
     header->page_count = pages;
@@ -227,7 +227,7 @@ static void kfree(void *address) {
 
     ui64 pages = header->page_count;
     header->magic = 0;
-    free_pages(header, pages);
+    memory_free_pages(header, pages);
 }
 
 void memory_init(const mb_info_t *mb_info) {

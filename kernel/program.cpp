@@ -2,6 +2,8 @@
 #include <console.h>
 #include <fs/fat32.h>
 #include <scheduler.h>
+#include <memory.h>
+#include <x86.h>
 
 namespace {
 
@@ -15,6 +17,7 @@ constexpr ui32 elf_program_dynamic = 2;
 constexpr ui32 elf_program_interpreter = 3;
 constexpr ui32 elf_program_tls = 7;
 constexpr ui32 elf_segment_executable = 1;
+constexpr ui32 elf_segment_writable = 2;
 constexpr ui64 elf_dynamic_needed = 1;
 constexpr ui64 elf_dynamic_rela = 7;
 constexpr ui64 elf_dynamic_rel = 17;
@@ -22,6 +25,21 @@ constexpr ui64 elf_dynamic_jmprel = 23;
 constexpr ui64 page_size = 4096;
 constexpr ui64 max_program_size = 16 * 1024 * 1024;
 constexpr ui16 max_program_headers = 64;
+constexpr ui64 user_base = 0x0000400000000000ULL;
+constexpr ui64 user_stack_address = user_base + max_program_size + page_size;
+constexpr ui64 user_api_address = user_stack_address + 2 * page_size;
+constexpr ui64 page_address_mask = 0x000ffffffffff000ULL;
+constexpr ui64 page_present = 1;
+constexpr ui64 page_writable = 2;
+constexpr ui64 page_user = 4;
+constexpr ui64 page_no_execute = 1ULL << 63;
+constexpr ui64 syscall_exit = 0;
+constexpr ui64 syscall_write = 1;
+constexpr ui64 syscall_yield = 2;
+constexpr ui64 syscall_result_exit = 0x100;
+constexpr ui64 syscall_result_failure = 0x101;
+constexpr ui64 max_syscall_text = 1024;
+constexpr ui64 max_page_tables = 16;
 
 struct elf64_header_t {
     ui8 ident[16];
@@ -56,6 +74,18 @@ struct elf64_dynamic_t {
     ui64 value;
 } __attribute__ ((packed));
 
+struct program_address_space_t {
+    ui64 *pml4;
+    ui8 *image;
+    ui64 image_pages;
+    ui8 *stack;
+    ui8 *api;
+    void *page_tables[max_page_tables];
+    ui64 page_table_count;
+};
+
+program_address_space_t *active_program = 0;
+
 bool range_fits(ui64 offset, ui64 size, ui64 limit) {
     return offset <= limit && size <= limit - offset;
 }
@@ -87,6 +117,105 @@ bool dynamic_segment_supported(const fat32_file_t &file,
     return true;
 }
 
+void zero_pages(void *address, ui64 count) {
+    ui8 *bytes = (ui8 *) address;
+    for (ui64 index = 0; index < count * page_size; index++) bytes[index] = 0;
+}
+
+ui64 *allocate_page_table(program_address_space_t *program) {
+    if (program->page_table_count == max_page_tables) return 0;
+    ui64 *table = (ui64 *) memory_alloc_pages(1);
+    if (table == 0) return 0;
+    zero_pages(table, 1);
+    program->page_tables[program->page_table_count++] = table;
+    return table;
+}
+
+ui64 *next_page_table(program_address_space_t *program, ui64 *table, ui64 index) {
+    if ((table[index] & page_present) != 0) {
+        if ((table[index] & (1ULL << 7)) != 0) return 0;
+        return (ui64 *) (uip) (table[index] & page_address_mask);
+    }
+
+    ui64 *next = allocate_page_table(program);
+    if (next == 0) return 0;
+    table[index] = (ui64) (uip) next | page_present | page_writable | page_user;
+    return next;
+}
+
+bool map_user_page(program_address_space_t *program, ui64 virtual_address,
+                   ui64 physical_address, bool writable, bool executable) {
+    ui64 *pdpt = next_page_table(program, program->pml4, (virtual_address >> 39) & 0x1ff);
+    if (pdpt == 0) return false;
+    ui64 *pd = next_page_table(program, pdpt, (virtual_address >> 30) & 0x1ff);
+    if (pd == 0) return false;
+    ui64 *pt = next_page_table(program, pd, (virtual_address >> 21) & 0x1ff);
+    if (pt == 0) return false;
+
+    ui64 &entry = pt[(virtual_address >> 12) & 0x1ff];
+    ui64 flags = page_present | page_user | (writable ? page_writable : 0) |
+                 (executable ? 0 : page_no_execute);
+    ui64 value = (physical_address & page_address_mask) | flags;
+    if ((entry & page_present) != 0) return entry == value;
+    entry = value;
+    return true;
+}
+
+bool user_address_mapped(const program_address_space_t *program, ui64 address) {
+    const ui64 *table = program->pml4;
+    const ui16 indices[4] = {(ui16) ((address >> 39) & 0x1ff),
+                             (ui16) ((address >> 30) & 0x1ff),
+                             (ui16) ((address >> 21) & 0x1ff),
+                             (ui16) ((address >> 12) & 0x1ff)};
+    for (ui8 level = 0; level < 4; level++) {
+        ui64 entry = table[indices[level]];
+        if ((entry & (page_present | page_user)) != (page_present | page_user)) return false;
+        if (level == 3) return true;
+        if ((entry & (1ULL << 7)) != 0) return false;
+        table = (const ui64 *) (uip) (entry & page_address_mask);
+    }
+    return false;
+}
+
+void destroy_address_space(program_address_space_t *program) {
+    for (ui64 index = 0; index < program->page_table_count; index++) {
+        memory_free_pages(program->page_tables[index], 1);
+    }
+    if (program->pml4 != 0) memory_free_pages(program->pml4, 1);
+    if (program->api != 0) memory_free_pages(program->api, 1);
+    if (program->stack != 0) memory_free_pages(program->stack, 1);
+    if (program->image != 0) memory_free_pages(program->image, program->image_pages);
+}
+
+}
+
+extern "C" ui64 program_syscall(ui64 number, ui64 argument1, ui64 argument2) {
+    if (active_program == 0) return syscall_result_failure;
+    if (number == syscall_exit) return syscall_result_exit;
+    if (number == syscall_yield) {
+        scheduler_yield();
+        return 0;
+    }
+    if (number != syscall_write) return syscall_result_failure;
+
+    char text[max_syscall_text];
+    const char *user_text = (const char *) (uip) argument1;
+    for (ui64 index = 0; index < max_syscall_text; index++) {
+        ui64 address = (ui64) (uip) (user_text + index);
+        if (!user_address_mapped(active_program, address)) return syscall_result_failure;
+        text[index] = user_text[index];
+        if (text[index] == 0) {
+            write_console(text, (ui32) argument2);
+            return 0;
+        }
+    }
+    return syscall_result_failure;
+}
+
+extern "C" [[noreturn]] void program_exception(ui64, ui64, ui64 code_selector) {
+    if (active_program != 0 && (code_selector & 3) == 3) x86_leave_user(false);
+    halt();
+    __builtin_unreachable();
 }
 
 bool program_run(const char *path) {
@@ -139,27 +268,89 @@ bool program_run(const char *path) {
     if (!entry_is_executable || lowest_address == (ui64) -1 || highest_address <= lowest_address ||
         highest_address - lowest_address > max_program_size) return false;
 
+    program_address_space_t program;
+    program.pml4 = 0;
+    program.image = 0;
+    program.image_pages = 0;
+    program.stack = 0;
+    program.api = 0;
+    program.page_table_count = 0;
     ui64 image_size = highest_address - lowest_address;
-    ui8 *allocation = new ui8[image_size + page_size - 1];
-    ui8 *image = (ui8 *) (((uip) allocation + page_size - 1) & ~(uip) (page_size - 1));
-    for (ui64 index = 0; index < image_size; index++) image[index] = 0;
+    program.image_pages = image_size / page_size;
+    program.image = (ui8 *) memory_alloc_pages(program.image_pages);
+    program.stack = (ui8 *) memory_alloc_pages(1);
+    program.api = (ui8 *) memory_alloc_pages(1);
+    program.pml4 = (ui64 *) memory_alloc_pages(1);
+    if (program.image == 0 || program.stack == 0 || program.api == 0 || program.pml4 == 0) {
+        destroy_address_space(&program);
+        return false;
+    }
+    zero_pages(program.image, program.image_pages);
+    zero_pages(program.stack, 1);
+    zero_pages(program.api, 1);
+
+    ui64 kernel_page_table;
+    asm ("mov %%cr3, %0" : "=r" (kernel_page_table));
+    const ui64 *kernel_pml4 = (const ui64 *) (uip) (kernel_page_table & page_address_mask);
+    for (ui16 index = 0; index < 512; index++) program.pml4[index] = kernel_pml4[index];
+    program.pml4[(user_base >> 39) & 0x1ff] = 0;
 
     for (ui16 index = 0; index < header.program_header_count; index++) {
         elf64_program_header_t program_header;
         if (!read_program_header(file, header, index, &program_header) ||
             (program_header.type == elf_program_load &&
              !read_exact(file, program_header.offset,
-                         image + program_header.virtual_address - lowest_address,
-                         program_header.file_size))) {
-            delete[] allocation;
+                          program.image + program_header.virtual_address - lowest_address,
+                          program_header.file_size))) {
+            destroy_address_space(&program);
             return false;
+        }
+        if (program_header.type != elf_program_load) continue;
+        if ((program_header.flags & (elf_segment_executable | elf_segment_writable)) ==
+            (elf_segment_executable | elf_segment_writable)) {
+            destroy_address_space(&program);
+            return false;
+        }
+
+        ui64 segment_start = program_header.virtual_address & ~(page_size - 1);
+        ui64 segment_end = (program_header.virtual_address + program_header.memory_size +
+                            page_size - 1) & ~(page_size - 1);
+        for (ui64 address = segment_start; address < segment_end; address += page_size) {
+            if (!map_user_page(&program, user_base + address - lowest_address,
+                               (ui64) (uip) program.image + address - lowest_address,
+                               (program_header.flags & elf_segment_writable) != 0,
+                               (program_header.flags & elf_segment_executable) != 0)) {
+                destroy_address_space(&program);
+                return false;
+            }
         }
     }
 
-    static const program_api_t api = { write_console, scheduler_yield };
-    typedef void (*program_entry_t) (const program_api_t *api);
-    program_entry_t entry = (program_entry_t) (image + header.entry - lowest_address);
-    entry(&api);
-    delete[] allocation;
-    return true;
+    constexpr ui64 write_stub_offset = 32;
+    constexpr ui64 yield_stub_offset = 48;
+    constexpr ui64 exit_stub_offset = 64;
+    program_api_t *api = (program_api_t *) program.api;
+    api->write_console = (void (*) (const char *, ui32)) (uip) (user_api_address + write_stub_offset);
+    api->yield = (void (*) ()) (uip) (user_api_address + yield_stub_offset);
+    const ui8 write_stub[] = {0xb8, 1, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 yield_stub[] = {0xb8, 2, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 exit_stub[] = {0x31, 0xc0, 0xcd, 0x80, 0xf4};
+    for (ui64 index = 0; index < sizeof(write_stub); index++) program.api[write_stub_offset + index] = write_stub[index];
+    for (ui64 index = 0; index < sizeof(yield_stub); index++) program.api[yield_stub_offset + index] = yield_stub[index];
+    for (ui64 index = 0; index < sizeof(exit_stub); index++) program.api[exit_stub_offset + index] = exit_stub[index];
+
+    ui64 user_stack_top = user_stack_address + page_size - sizeof(ui64);
+    *(ui64 *) (program.stack + page_size - sizeof(ui64)) = user_api_address + exit_stub_offset;
+    if (!map_user_page(&program, user_stack_address, (ui64) (uip) program.stack, true, false) ||
+        !map_user_page(&program, user_api_address, (ui64) (uip) program.api, false, true)) {
+        destroy_address_space(&program);
+        return false;
+    }
+
+    active_program = &program;
+    bool success = x86_enter_user(user_base + header.entry - lowest_address, user_stack_top,
+                                  user_api_address, (ui64) (uip) program.pml4);
+    active_program = 0;
+    destroy_address_space(&program);
+    return success;
 }
