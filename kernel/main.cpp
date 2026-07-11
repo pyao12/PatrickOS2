@@ -12,30 +12,22 @@
 
 void taska(void *arg) {
     (void) arg;
+    write_console("Task A begin\n");
     for (int i = 1; i <= 100000; i++) {
         // print_char((char) ('0' + i % 10), 20, 20, COLOR_WHITE);
-        if (i % 10000 == 0) {
-            char buffer[21];
-            write_console("Task A: Count");
-            write_console(int2str(i / 10000, buffer));
-            write_console("\n");
-        }
         scheduler_yield();
     }
+    write_console("Task A end\n");
 }
 
 void taskb(void *arg) {
     (void) arg;
-    for (int i = 1; i <= 100000; i++) {
+    write_console("Task B begin\n");
+    for (int i = 1; i <= 50000; i++) {
         // print_char((char) ('0' + i % 10), 20, 50, COLOR_WHITE);
-        if (i % 10000 == 0) {
-            char buffer[21];
-            write_console("Task B: Count");
-            write_console(int2str(i / 10000, buffer));
-            write_console("\n");
-        }
         scheduler_yield();
     }
+    write_console("Task B end\n");
 }
 
 extern "C" void kernel_main(ui32 mb_info_addr) { 

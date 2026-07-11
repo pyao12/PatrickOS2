@@ -26,5 +26,16 @@ struct fat32_file_t {
     ui32 size;
 };
 
+struct fat32_directory_entry_t {
+    char name[13];
+    ui8 attributes;
+    ui32 first_cluster;
+    ui32 size;
+    fat32_directory_entry_t *next;
+};
+
 bool fat32_open(const fat32_filesystem_t *filesystem, const char *path, fat32_file_t *file);
 i64 fat32_read(const fat32_file_t *file, ui32 offset, ui8 *buffer, ui32 size);
+fat32_directory_entry_t *fat32_list_directory(const fat32_filesystem_t *filesystem,
+                                              const char *path);
+void fat32_free_directory_list(fat32_directory_entry_t *entries);
