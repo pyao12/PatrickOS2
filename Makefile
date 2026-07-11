@@ -54,6 +54,8 @@ $(BUILD_DIR)/pos2.img: $(BUILD_DIR)/kernel.elf
 	@dd if=$(BUILD_DIR)/grub/core.img of=$@ bs=512 seek=1 conv=notrunc status=none
 
 	@mcopy -i $@@@$(PARTITION_OFFBYS) -s $(BUILD_DIR)/grubroot/* ::
+	@echo "PatrickOS 2 FAT32 read-only filesystem demo.\nLine 2" > $(BUILD_DIR)/HELLO.TXT
+	@mcopy -i $@@@$(PARTITION_OFFBYS) $(BUILD_DIR)/HELLO.TXT ::/HELLO.TXT
 
 run: $(BUILD_DIR)/pos2.img
 	@echo "\033[36m[Other]\033[0m Launching QEMU..."

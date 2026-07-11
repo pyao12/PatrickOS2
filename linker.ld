@@ -9,6 +9,7 @@ PHDRS
 SECTIONS
 {
     . = 1M;
+    kernel_start = .;
 
     .multiboot :
     {

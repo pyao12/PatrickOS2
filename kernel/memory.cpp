@@ -25,7 +25,7 @@ static ui64 usable_page_count = 0;
 static ui64 free_page_count = 0;
 static bool memory_ready = false;
 
-extern "C" ui8 _start;
+extern "C" ui8 kernel_start;
 extern "C" ui8 kernel_end;
 
 static void mark_page_used(ui64 page) {
@@ -79,7 +79,8 @@ static void reserve_range(ui64 start, ui64 length) {
 
 static void reserve_boot_data(const mb_info_t *mb_info) {
     reserve_range(0, 0x100000);
-    reserve_range((ui64) (uip) &_start, (ui64) (uip) &kernel_end - (ui64) (uip) &_start);
+    reserve_range((ui64) (uip) &kernel_start,
+                  (ui64) (uip) &kernel_end - (ui64) (uip) &kernel_start);
     reserve_range((ui64) (uip) page_bitmap, (page_count + 7) / 8);
     reserve_range((ui64) (uip) mb_info, sizeof(mb_info_t));
 
@@ -114,8 +115,8 @@ static bool ranges_overlap(ui64 first_start, ui64 first_length, ui64 second_star
 
 static bool overlaps_boot_data(const mb_info_t *mb_info, ui64 start, ui64 length) {
     if (ranges_overlap(start, length, 0, 0x100000) ||
-        ranges_overlap(start, length, (ui64) (uip) &_start,
-                       (ui64) (uip) &kernel_end - (ui64) (uip) &_start) ||
+        ranges_overlap(start, length, (ui64) (uip) &kernel_start,
+                       (ui64) (uip) &kernel_end - (ui64) (uip) &kernel_start) ||
         ranges_overlap(start, length, (ui64) (uip) mb_info, sizeof(mb_info_t)) ||
         ranges_overlap(start, length, mb_info->mmap_addr, mb_info->mmap_length)) {
         return true;

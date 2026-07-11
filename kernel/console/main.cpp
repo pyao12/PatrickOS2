@@ -2,6 +2,7 @@
 #include <graphics/basic.h>
 #include <memory.h>
 #include <scheduler.h>
+#include <fs/fat32.h>
 
 #include <algo/convert.h>
 
@@ -60,6 +61,32 @@ static void write_memory_size(const char *label, ui64 size) {
     write_console(" MiB\n");
 }
 
+static void write_fat32_demo() {
+    fat32_filesystem_t filesystem;
+    fat32_file_t file;
+    char content[1024];
+
+    if (!fat32_mount_primary_ata(&filesystem)) {
+        write_console("FAT32 mount failed\n");
+        return;
+    }
+    if (!fat32_open(&filesystem, "/HELLO.TXT", &file)) {
+        write_console("FAT32 HELLO.TXT not found\n");
+        return;
+    }
+
+    i64 bytes_read = fat32_read(&file, 0, (ui8 *) content, sizeof(content) - 1);
+    if (bytes_read < 0) {
+        write_console("FAT32 HELLO.TXT read failed\n");
+        return;
+    }
+
+    content[bytes_read] = 0;
+    write_console("\nFAT32 HELLO.TXT:\n");
+    write_console(content);
+    write_console("\n");
+}
+
 void console_main(void *arg) {
     (void) arg;
 
@@ -68,6 +95,7 @@ void console_main(void *arg) {
     write_memory_size("Physical address range: ", memory_physical_size());
     write_memory_size("Usable physical memory: ", memory_usable_size());
     write_memory_size("Allocator free memory: ", memory_free_size());
+    write_fat32_demo();
 
     while (true) scheduler_yield();
 }
