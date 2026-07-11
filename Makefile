@@ -8,7 +8,7 @@ FLAGS_CPP     := $(_FLAGS_COMMON) -ffreestanding -fno-exceptions -mno-red-zone -
 FLAGS_AS      := $(_FLAGS_COMMON)
 FLAGS_LD      := -m elf_x86_64 -T linker.ld
 
-FLAGS_QEMU := -serial stdio --no-reboot
+QEMUFLAGS ?= -serial stdio --no-reboot -m 2048
 
 BUILD_DIR        := build
 PARTITION_OFFSET := 2048

@@ -24,24 +24,8 @@ pml4_table:
 .skip 4096
 
 .align 4096
-pdpt_table:
-.skip 4096
-
-.align 4096
-pd_table0:
-.skip 4096
-
-.align 4096
-pd_table1:
-.skip 4096
-
-.align 4096
-pd_table2:
-.skip 4096
-
-.align 4096
-pd_table3:
-.skip 4096
+pdpt_tables:
+.skip 1048576
 
 .section .rodata
 .align 8
@@ -92,43 +76,38 @@ _start:
     ljmp $CODE64_SEL, $long_mode_entry
 
 setup_page_tables:
-    movl $(pdpt_table + 0x00000003), pml4_table
-    movl $0x00000000, pml4_table + 4
+    # Map the complete 128 TiB low canonical address range. Every PDPT
+    # entry is a 1 GiB page, so no per-2 MiB page-directory tables are needed.
+    xor %ecx, %ecx
+    mov $pml4_table, %edi
+    mov $pdpt_tables, %edx
 
-    movl $(pd_table0 + 0x00000003), pdpt_table
-    movl $0x00000000, pdpt_table + 4
-    movl $(pd_table1 + 0x00000003), pdpt_table + 8
-    movl $0x00000000, pdpt_table + 12
-    movl $(pd_table2 + 0x00000003), pdpt_table + 16
-    movl $0x00000000, pdpt_table + 20
-    movl $(pd_table3 + 0x00000003), pdpt_table + 24
-    movl $0x00000000, pdpt_table + 28
+map_pml4_entry:
+    mov %edx, %eax
+    or $0x00000003, %eax
+    mov %eax, (%edi)
+    movl $0x00000000, 4(%edi)
+    add $4096, %edx
+    add $8, %edi
+    inc %ecx
+    cmp $256, %ecx
+    jne map_pml4_entry
 
     xor %ecx, %ecx
-    mov $pd_table0, %edi
-    call map_pd_table
-    mov $pd_table1, %edi
-    call map_pd_table
-    mov $pd_table2, %edi
-    call map_pd_table
-    mov $pd_table3, %edi
-    call map_pd_table
-    ret
+    mov $pdpt_tables, %edi
 
-map_pd_table:
-    xor %esi, %esi
-
-map_pd_entry:
+map_pdpt_entry:
     mov %ecx, %eax
-    shl $21, %eax
+    shl $30, %eax
     or $0x00000083, %eax
-    mov %eax, (%edi, %esi, 8)
-    mov $0x00000000, %eax
-    mov %eax, 4(%edi, %esi, 8)
+    mov %eax, (%edi)
+    mov %ecx, %eax
+    shr $2, %eax
+    mov %eax, 4(%edi)
+    add $8, %edi
     inc %ecx
-    inc %esi
-    cmp $512, %esi
-    jne map_pd_entry
+    cmp $131072, %ecx
+    jne map_pdpt_entry
     ret
 
 .code64

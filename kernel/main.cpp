@@ -13,7 +13,7 @@
 void taska(void *arg) {
     (void) arg;
     for (int i = 1; i <= 100000; i++) {
-        // print_char((char) ('0' + i % 10), 20, 20, 0x00ffffff);
+        // print_char((char) ('0' + i % 10), 20, 20, COLOR_WHITE);
         if (i % 10000 == 0) {
             char buffer[21];
             write_console("Task A: Count");
@@ -27,7 +27,7 @@ void taska(void *arg) {
 void taskb(void *arg) {
     (void) arg;
     for (int i = 1; i <= 100000; i++) {
-        // print_char((char) ('0' + i % 10), 20, 50, 0x00ffffff);
+        // print_char((char) ('0' + i % 10), 20, 50, COLOR_WHITE);
         if (i % 10000 == 0) {
             char buffer[21];
             write_console("Task B: Count");

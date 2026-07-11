@@ -1,6 +1,9 @@
 #include <graphics/font.h>
 #include <graphics/basic.h>
+#include <memory.h>
 #include <scheduler.h>
+
+#include <algo/convert.h>
 
 constexpr int max_line      = 48;  // 768 / 16
 constexpr int line_max_char = 160; // 1280 / 8
@@ -28,7 +31,7 @@ static void prepare_cursor() {
     }
 }
 
-void write_console(const char* str, ui32 color = 0x00ffffff) {
+void write_console(const char* str, ui32 color = COLOR_WHITE) {
     if (str == 0) {
         return;
     }
@@ -50,10 +53,21 @@ void write_console(const char* str, ui32 color = 0x00ffffff) {
     }
 }
 
+static void write_memory_size(const char *label, ui64 size) {
+    char buffer[21];
+    write_console(label);
+    write_console(int2str(size / (1024 * 1024), buffer));
+    write_console(" MiB\n");
+}
+
 void console_main(void *arg) {
     (void) arg;
 
     clear_screen();
     write_console("Welcome to PatrickOS 2 Console!\n");
+    write_memory_size("Physical address range: ", memory_physical_size());
+    write_memory_size("Usable physical memory: ", memory_usable_size());
+    write_memory_size("Allocator free memory: ", memory_free_size());
+
     while (true) scheduler_yield();
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <common.h>
+#include "colors.h"
 
 // 类型定义
 typedef struct mb_info {

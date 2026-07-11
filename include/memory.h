@@ -12,3 +12,6 @@ typedef struct mb_mmap_entry {
 } __attribute__ ((packed)) mb_mmap_entry_t;
 
 void memory_init(const mb_info_t *mb_info);
+ui64 memory_physical_size();
+ui64 memory_usable_size();
+ui64 memory_free_size();
