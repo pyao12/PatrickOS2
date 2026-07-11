@@ -1,5 +1,6 @@
 #include <graphics/font.h>
 #include <graphics/basic.h>
+#include <scheduler.h>
 
 constexpr int max_line      = 48;  // 768 / 16
 constexpr int line_max_char = 160; // 1280 / 8
@@ -49,7 +50,10 @@ void write_console(const char* str, ui32 color = 0x00ffffff) {
     }
 }
 
-void console_main() {
+void console_main(void *arg) {
+    (void) arg;
+
     clear_screen();
     write_console("Welcome to PatrickOS 2 Console!\n");
+    while (true) scheduler_yield();
 }

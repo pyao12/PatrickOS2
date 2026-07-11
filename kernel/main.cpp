@@ -29,6 +29,7 @@ extern "C" void kernel_main(ui32 mb_info_addr) {
     graphics_init(mb_info);
 
     scheduler_init();
+    if (scheduler_create_task(console_main, 0) < 0) halt();
     if (scheduler_create_task(taska, 0) < 0) halt();
     if (scheduler_create_task(taskb, 0) < 0) halt();
 
