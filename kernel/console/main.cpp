@@ -5,6 +5,7 @@
 #include <fs/fat32.h>
 #include <input.h>
 #include <algo/convert.h>
+#include <program.h>
 
 constexpr int max_line      = 48;
 constexpr int line_max_char = 160;
@@ -138,6 +139,7 @@ static void cmd_help() {
     write_console("  cd    - change directory\n", COLOR_GRAY);
     write_console("  ls    - list directory\n", COLOR_GRAY);
     write_console("  cat   - display file contents\n", COLOR_GRAY);
+    write_console("  run   - run an ELF program\n", COLOR_GRAY);
     write_console("  clear - clear screen\n", COLOR_GRAY);
 }
 
@@ -231,6 +233,21 @@ static void cmd_clear() {
     current_char = 0;
 }
 
+static void cmd_run(const char *arg) {
+    if (arg[0] == 0) {
+        write_console("run: missing program argument\n", COLOR_RED);
+        return;
+    }
+
+    char raw[max_path_len];
+    if (arg[0] == '/') str_copy(raw, arg, max_path_len);
+    else str_concat(raw, cwd, arg, max_path_len);
+
+    char path[max_path_len];
+    resolve_path(raw, path, max_path_len);
+    if (!program_run(path)) write_console("run: cannot load program\n", COLOR_RED);
+}
+
 static void parse_and_exec(char *cmd) {
     while (*cmd == ' ') cmd++;
     ui32 len = str_len(cmd);
@@ -258,6 +275,8 @@ static void parse_and_exec(char *cmd) {
         cmd_ls();
     } else if (str_eq(cmd, "cat")) {
         cmd_cat(arg);
+    } else if (str_eq(cmd, "run")) {
+        cmd_run(arg);
     } else if (str_eq(cmd, "clear")) {
         cmd_clear();
     } else {
