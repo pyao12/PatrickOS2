@@ -1,5 +1,7 @@
 #include <fs/fat32.h>
 
+static fat32_filesystem_t primary_filesystem;
+
 static ui16 read_le16(const ui8 *buffer) {
     return (ui16) buffer[0] | ((ui16) buffer[1] << 8);
 }
@@ -159,4 +161,16 @@ bool fat32_mount_primary_ata(fat32_filesystem_t *filesystem) {
     }
 
     return false;
+}
+
+bool fat32_mount_primary_ata() {
+    return fat32_mount_primary_ata(&primary_filesystem);
+}
+
+bool fat32_open(const char *path, fat32_file_t *file) {
+    return fat32_open(&primary_filesystem, path, file);
+}
+
+fat32_directory_entry_t *fat32_list_directory(const char *path) {
+    return fat32_list_directory(&primary_filesystem, path);
 }

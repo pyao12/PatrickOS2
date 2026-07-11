@@ -64,13 +64,11 @@ static void write_memory_size(const char *label, ui64 size) {
     write_console(" MiB\n");
 }
 
-fat32_filesystem_t filesystem;
-
 static void readfile_demo() {
     fat32_file_t file;
     char content[1024];
 
-    if (!fat32_open(&filesystem, "/HELLO.TXT", &file)) {
+    if (!fat32_open("/HELLO.TXT", &file)) {
         write_console("FAT32 HELLO.TXT not found\n");
         return;
     }
@@ -110,7 +108,7 @@ static bool fat32_demo_make_path(const char *parent, const char *name,
 }
 
 static void fat32_demo_wc_directory(const char *path, ui32 depth) {
-    fat32_directory_entry_t *entries = fat32_list_directory(&filesystem, path);
+    fat32_directory_entry_t *entries = fat32_list_directory(path);
     for (fat32_directory_entry_t *entry = entries; entry != 0; entry = entry->next) {
         for (ui32 indent = 0; indent < depth; indent++) write_console("  ");
 
@@ -145,11 +143,6 @@ static void readdir_demo() {
 
 void console_main(void *arg) {
     (void) arg;
-
-    if (!fat32_mount_primary_ata(&filesystem)) {
-        write_console("FAT32 mount failed\n");
-        return;
-    }
 
     clear_screen();
     write_console("Welcome to PatrickOS 2 Console!\n");

@@ -2,6 +2,7 @@
 #include <graphics/basic.h>
 #include <graphics/font.h>
 #include <console.h>
+#include <fs/fat32.h>
 #include <memory.h>
 #include <scheduler.h>
 
@@ -35,6 +36,8 @@ extern "C" void kernel_main(ui32 mb_info_addr) {
     mb_info_t *mb_info = (mb_info_t *) (uip) mb_info_addr;
     graphics_init(mb_info);
     memory_init(mb_info);
+
+    if (!fat32_mount_primary_ata()) halt();
 
     ui64 *memory_test = new ui64;
     *memory_test = 0x504f5332ULL;
