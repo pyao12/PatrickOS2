@@ -90,6 +90,8 @@ x86_syscall_stub:
     push %r13
     push %r14
     push %r15
+    mov %rcx, %r8
+    mov %rdx, %rcx
     mov %rsi, %rdx
     mov %rdi, %rsi
     mov %rax, %rdi

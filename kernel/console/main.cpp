@@ -11,7 +11,6 @@ constexpr int max_line      = 48;
 constexpr int line_max_char = 160;
 constexpr int max_cmd_len   = 128;
 constexpr int max_path_len  = 256;
-constexpr ui32 fat32_directory_attribute = 0x10;
 
 static ui16 current_line = 0, current_char = 0;
 static char cwd[max_path_len] = "/";
@@ -175,22 +174,6 @@ static void cmd_cd(const char *arg) {
     }
 }
 
-static void cmd_ls() {
-    fat32_directory_entry_t *entries = fat32_list_directory(cwd);
-    if (entries == 0) {
-        write_console("ls: cannot list directory\n", COLOR_RED);
-        return;
-    }
-
-    for (fat32_directory_entry_t *entry = entries; entry; entry = entry->next) {
-        bool is_dir = (entry->attributes & fat32_directory_attribute) != 0;
-        write_console(entry->name, is_dir ? COLOR_CYAN : COLOR_WHITE);
-        write_console(is_dir ? "/  " : "  ", COLOR_WHITE);
-    }
-    write_console("\n", COLOR_WHITE);
-    fat32_free_directory_list(entries);
-}
-
 static void cmd_cat(const char *arg) {
     if (arg[0] == 0) {
         write_console("cat: missing file argument\n", COLOR_RED);
@@ -207,24 +190,11 @@ static void cmd_cat(const char *arg) {
     char path[max_path_len];
     resolve_path(raw, path, max_path_len);
 
-    fat32_file_t file;
-    if (!fat32_open(path, &file)) {
-        write_console("cat: ", COLOR_RED);
-        write_console(arg, COLOR_RED);
-        write_console(": no such file\n", COLOR_RED);
-        return;
-    }
+    if (!program_run("/programs/cat.elf", path)) write_console("cat: cannot load program\n", COLOR_RED);
+}
 
-    char content[4096];
-    i64 bytes_read = fat32_read(&file, 0, (ui8 *)content, sizeof(content) - 1);
-    if (bytes_read < 0) {
-        write_console("cat: read error\n", COLOR_RED);
-        return;
-    }
-
-    content[bytes_read] = 0;
-    write_console(content, COLOR_WHITE);
-    write_console("\n", COLOR_WHITE);
+static void cmd_ls() {
+    if (!program_run("/programs/ls.elf", cwd)) write_console("ls: cannot load program\n", COLOR_RED);
 }
 
 static void cmd_clear() {

@@ -36,9 +36,13 @@ constexpr ui64 page_no_execute = 1ULL << 63;
 constexpr ui64 syscall_exit = 0;
 constexpr ui64 syscall_write = 1;
 constexpr ui64 syscall_yield = 2;
+constexpr ui64 syscall_read_file = 3;
+constexpr ui64 syscall_list_directory = 4;
 constexpr ui64 syscall_result_exit = 0x100;
 constexpr ui64 syscall_result_failure = 0x101;
 constexpr ui64 max_syscall_text = 1024;
+constexpr ui64 max_syscall_path = 256;
+constexpr ui64 max_syscall_io = 4096;
 constexpr ui64 max_page_tables = 16;
 
 struct elf64_header_t {
@@ -177,6 +181,27 @@ bool user_address_mapped(const program_address_space_t *program, ui64 address) {
     return false;
 }
 
+bool user_range_mapped(const program_address_space_t *program, ui64 address, ui64 size) {
+    if (size == 0) return true;
+    if (address > (ui64) -1 - (size - 1)) return false;
+    ui64 end = address + size - 1;
+    for (ui64 page = address & ~(page_size - 1); page <= end; page += page_size) {
+        if (!user_address_mapped(program, page)) return false;
+        if (page > (ui64) -1 - page_size) return false;
+    }
+    return true;
+}
+
+bool copy_user_string(const char *user_text, char *text, ui64 capacity) {
+    for (ui64 index = 0; index < capacity; index++) {
+        ui64 address = (ui64) (uip) (user_text + index);
+        if (!user_address_mapped(active_program, address)) return false;
+        text[index] = user_text[index];
+        if (text[index] == 0) return true;
+    }
+    return false;
+}
+
 void destroy_address_space(program_address_space_t *program) {
     for (ui64 index = 0; index < program->page_table_count; index++) {
         memory_free_pages(program->page_tables[index], 1);
@@ -189,27 +214,56 @@ void destroy_address_space(program_address_space_t *program) {
 
 }
 
-extern "C" ui64 program_syscall(ui64 number, ui64 argument1, ui64 argument2) {
+extern "C" ui64 program_syscall(ui64 number, ui64 argument1, ui64 argument2,
+                                 ui64 argument3, ui64 argument4) {
     if (active_program == 0) return syscall_result_failure;
     if (number == syscall_exit) return syscall_result_exit;
     if (number == syscall_yield) {
         scheduler_yield();
         return 0;
     }
-    if (number != syscall_write) return syscall_result_failure;
-
-    char text[max_syscall_text];
-    const char *user_text = (const char *) (uip) argument1;
-    for (ui64 index = 0; index < max_syscall_text; index++) {
-        ui64 address = (ui64) (uip) (user_text + index);
-        if (!user_address_mapped(active_program, address)) return syscall_result_failure;
-        text[index] = user_text[index];
-        if (text[index] == 0) {
-            write_console(text, (ui32) argument2);
-            return 0;
+    if (number == syscall_write) {
+        char text[max_syscall_text];
+        if (!copy_user_string((const char *) (uip) argument1, text, sizeof(text))) {
+            return syscall_result_failure;
         }
+        write_console(text, (ui32) argument2);
+        return 0;
     }
-    return syscall_result_failure;
+
+    char path[max_syscall_path];
+    if ((number != syscall_read_file && number != syscall_list_directory) ||
+        !copy_user_string((const char *) (uip) argument1, path, sizeof(path))) {
+        return syscall_result_failure;
+    }
+
+    if (number == syscall_read_file) {
+        if (argument2 > 0xffffffffu || argument4 > max_syscall_io ||
+            !user_range_mapped(active_program, argument3, argument4)) return syscall_result_failure;
+        fat32_file_t file;
+        if (!fat32_open(path, &file)) return (ui64) -1;
+        return (ui64) fat32_read(&file, (ui32) argument2, (ui8 *) (uip) argument3,
+                                 (ui32) argument4);
+    }
+
+    if (argument3 > 64 ||
+        !user_range_mapped(active_program, argument2,
+                           argument3 * sizeof(program_directory_entry_t))) {
+        return syscall_result_failure;
+    }
+    fat32_directory_entry_t *entries = fat32_list_directory(path);
+    if (entries == 0) return (ui64) -1;
+    ui64 count = 0;
+    program_directory_entry_t *user_entries = (program_directory_entry_t *) (uip) argument2;
+    for (fat32_directory_entry_t *entry = entries; entry != 0 && count < argument3;
+         entry = entry->next, count++) {
+        for (ui64 index = 0; index < sizeof(entry->name); index++) {
+            user_entries[count].name[index] = entry->name[index];
+        }
+        user_entries[count].attributes = entry->attributes;
+    }
+    fat32_free_directory_list(entries);
+    return count;
 }
 
 extern "C" [[noreturn]] void program_exception(ui64, ui64, ui64 code_selector) {
@@ -218,7 +272,7 @@ extern "C" [[noreturn]] void program_exception(ui64, ui64, ui64 code_selector) {
     __builtin_unreachable();
 }
 
-bool program_run(const char *path) {
+bool program_run(const char *path, const char *argument) {
     fat32_file_t file;
     elf64_header_t header;
     if (path == 0 || !fat32_open(path, &file) || !read_exact(file, 0, &header, sizeof(header))) return false;
@@ -326,18 +380,34 @@ bool program_run(const char *path) {
         }
     }
 
-    constexpr ui64 write_stub_offset = 32;
-    constexpr ui64 yield_stub_offset = 48;
-    constexpr ui64 exit_stub_offset = 64;
+    constexpr ui64 write_stub_offset = 512;
+    constexpr ui64 yield_stub_offset = 528;
+    constexpr ui64 read_file_stub_offset = 544;
+    constexpr ui64 list_directory_stub_offset = 560;
+    constexpr ui64 exit_stub_offset = 576;
+    constexpr ui64 argument_offset = 128;
     program_api_t *api = (program_api_t *) program.api;
     api->write_console = (void (*) (const char *, ui32)) (uip) (user_api_address + write_stub_offset);
     api->yield = (void (*) ()) (uip) (user_api_address + yield_stub_offset);
+    api->argument = (const char *) (uip) (user_api_address + argument_offset);
+    api->read_file = (i64 (*) (const char *, ui32, ui8 *, ui32))
+        (uip) (user_api_address + read_file_stub_offset);
+    api->list_directory = (i64 (*) (const char *, program_directory_entry_t *, ui32))
+        (uip) (user_api_address + list_directory_stub_offset);
     const ui8 write_stub[] = {0xb8, 1, 0, 0, 0, 0xcd, 0x80, 0xc3};
     const ui8 yield_stub[] = {0xb8, 2, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 read_file_stub[] = {0xb8, 3, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 list_directory_stub[] = {0xb8, 4, 0, 0, 0, 0xcd, 0x80, 0xc3};
     const ui8 exit_stub[] = {0x31, 0xc0, 0xcd, 0x80, 0xf4};
     for (ui64 index = 0; index < sizeof(write_stub); index++) program.api[write_stub_offset + index] = write_stub[index];
     for (ui64 index = 0; index < sizeof(yield_stub); index++) program.api[yield_stub_offset + index] = yield_stub[index];
+    for (ui64 index = 0; index < sizeof(read_file_stub); index++) program.api[read_file_stub_offset + index] = read_file_stub[index];
+    for (ui64 index = 0; index < sizeof(list_directory_stub); index++) program.api[list_directory_stub_offset + index] = list_directory_stub[index];
     for (ui64 index = 0; index < sizeof(exit_stub); index++) program.api[exit_stub_offset + index] = exit_stub[index];
+    for (ui64 index = 0; argument != 0 && argument[index] != 0 && index + 1 < page_size - argument_offset;
+         index++) {
+        program.api[argument_offset + index] = argument[index];
+    }
 
     ui64 user_stack_top = user_stack_address + page_size - sizeof(ui64);
     *(ui64 *) (program.stack + page_size - sizeof(ui64)) = user_api_address + exit_stub_offset;
