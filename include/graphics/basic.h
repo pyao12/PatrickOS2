@@ -46,3 +46,4 @@ typedef struct graphics_state {
 
 // 函数声明
 void graphics_init(const mb_info_t *mb_info);
+void draw_pixel(ui32 posx, ui32 posy, ui32 color);
