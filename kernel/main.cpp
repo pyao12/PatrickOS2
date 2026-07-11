@@ -5,6 +5,7 @@
 #include <fs/fat32.h>
 #include <memory.h>
 #include <scheduler.h>
+#include <devices/keyboard.h>
 
 #include <algo/convert.h>
 
@@ -57,6 +58,7 @@ extern "C" void kernel_main(ui32 mb_info_addr) {
     if (scheduler_create_task(console_main, 0) < 0) halt();
     if (scheduler_create_task(taska, 0) < 0) halt();
     if (scheduler_create_task(taskb, 0) < 0) halt();
+    if (scheduler_create_task(keyboard_main, 0) < 0) halt();
 
     scheduler_run();
 
