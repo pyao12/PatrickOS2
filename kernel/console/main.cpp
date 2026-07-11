@@ -158,13 +158,14 @@ static void cmd_cd(const char *arg) {
     char path[max_path_len];
     resolve_path(raw, path, max_path_len);
 
-    fat32_directory_entry_t *entries = fat32_list_directory(path);
-    if (entries == 0) {
+    if (!fat32_directory_exists(path)) {
         write_console("cd: no such directory: ", COLOR_RED);
         write_console(arg, COLOR_RED);
         write_console("\n", COLOR_RED);
         return;
     }
+
+    fat32_directory_entry_t *entries = fat32_list_directory(path);
     fat32_free_directory_list(entries);
     str_copy(cwd, path, max_path_len);
     ui32 cwd_len = str_len(cwd);
@@ -190,11 +191,11 @@ static void cmd_cat(const char *arg) {
     char path[max_path_len];
     resolve_path(raw, path, max_path_len);
 
-    if (!program_run("/programs/cat.elf", path)) write_console("cat: cannot load program\n", COLOR_RED);
+    if (!program_run("/programs/cat.elf", path, cwd)) write_console("cat: cannot load program\n", COLOR_RED);
 }
 
 static void cmd_ls() {
-    if (!program_run("/programs/ls.elf", cwd)) write_console("ls: cannot load program\n", COLOR_RED);
+    if (!program_run("/programs/ls.elf", cwd, cwd)) write_console("ls: cannot load program\n", COLOR_RED);
 }
 
 static void cmd_clear() {
@@ -215,7 +216,7 @@ static void cmd_run(const char *arg) {
 
     char path[max_path_len];
     resolve_path(raw, path, max_path_len);
-    if (!program_run(path)) write_console("run: cannot load program\n", COLOR_RED);
+    if (!program_run(path, "", cwd)) write_console("run: cannot load program\n", COLOR_RED);
 }
 
 static bool run_program_command(const char *cmd, const char *arg) {
@@ -234,7 +235,13 @@ static bool run_program_command(const char *cmd, const char *arg) {
 
     fat32_file_t file;
     if (!fat32_open(path, &file)) return false;
-    return program_run(path, arg);
+    char raw[max_path_len];
+    if (arg[0] == '/') str_copy(raw, arg, max_path_len);
+    else str_concat(raw, cwd, arg, max_path_len);
+
+    char resolved[max_path_len];
+    resolve_path(raw, resolved, max_path_len);
+    return program_run(path, resolved, cwd);
 }
 
 static void parse_and_exec(char *cmd) {

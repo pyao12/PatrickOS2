@@ -9,7 +9,7 @@ typedef struct mb_mmap_entry {
     ui64 addr;
     ui64 length;
     ui32 type;
-} __attribute__ ((packed)) mb_mmap_entry_t;
+} __attribute__((packed)) mb_mmap_entry_t;
 
 void memory_init(const mb_info_t *mb_info);
 void *memory_alloc_pages(ui64 count);

@@ -321,6 +321,38 @@ fat32_directory_entry_t *fat32_list_directory(const fat32_filesystem_t *filesyst
     return 0;
 }
 
+bool fat32_directory_exists(const fat32_filesystem_t *filesystem, const char *path) {
+    if (filesystem == 0 || path == 0 || !filesystem->mounted) return false;
+
+    const char *cursor = path;
+    while (*cursor == '/') cursor++;
+    if (*cursor == 0) return true;
+
+    ui32 directory_cluster = filesystem->root_cluster;
+    while (*cursor != 0) {
+        const char *segment_start = cursor;
+        while (*cursor != 0 && *cursor != '/') cursor++;
+        ui32 segment_length = (ui32) (cursor - segment_start);
+
+        ui8 name[11];
+        if (!fat32_make_name(segment_start, segment_length, name)) return false;
+
+        while (*cursor == '/') cursor++;
+
+        ui8 entry[32];
+        if (!fat32_find_in_directory(filesystem, directory_cluster, name, entry) ||
+            (entry[11] & 0x10) == 0) {
+            return false;
+        }
+
+        ui32 first_cluster = ((ui32) read_le16(entry + 20) << 16) | read_le16(entry + 26);
+        if (!fat32_cluster_valid(filesystem, first_cluster)) return false;
+        directory_cluster = first_cluster;
+    }
+
+    return true;
+}
+
 void fat32_free_directory_list(fat32_directory_entry_t *entries) {
     while (entries != 0) {
         fat32_directory_entry_t *next = entries->next;

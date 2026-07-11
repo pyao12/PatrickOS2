@@ -38,6 +38,11 @@ constexpr ui64 syscall_write = 1;
 constexpr ui64 syscall_yield = 2;
 constexpr ui64 syscall_read_file = 3;
 constexpr ui64 syscall_list_directory = 4;
+constexpr ui64 syscall_create_file = 5;
+constexpr ui64 syscall_create_directory = 6;
+constexpr ui64 syscall_write_file = 7;
+constexpr ui64 syscall_rename_path = 8;
+constexpr ui64 syscall_remove_path = 9;
 constexpr ui64 syscall_result_exit = 0x100;
 constexpr ui64 syscall_result_failure = 0x101;
 constexpr ui64 max_syscall_text = 1024;
@@ -232,7 +237,10 @@ extern "C" ui64 program_syscall(ui64 number, ui64 argument1, ui64 argument2,
     }
 
     char path[max_syscall_path];
-    if ((number != syscall_read_file && number != syscall_list_directory) ||
+    if ((number != syscall_read_file && number != syscall_list_directory &&
+         number != syscall_create_file && number != syscall_create_directory &&
+         number != syscall_write_file && number != syscall_rename_path &&
+         number != syscall_remove_path) ||
         !copy_user_string((const char *) (uip) argument1, path, sizeof(path))) {
         return syscall_result_failure;
     }
@@ -246,13 +254,32 @@ extern "C" ui64 program_syscall(ui64 number, ui64 argument1, ui64 argument2,
                                  (ui32) argument4);
     }
 
+    if (number == syscall_create_file) return fat32_create_file(path) ? 0 : (ui64) -1;
+    if (number == syscall_create_directory) return fat32_create_directory(path) ? 0 : (ui64) -1;
+    if (number == syscall_remove_path) return fat32_remove(path) ? 0 : (ui64) -1;
+
+    if (number == syscall_rename_path) {
+        char new_path[max_syscall_path];
+        if (!copy_user_string((const char *) (uip) argument2, new_path, sizeof(new_path))) {
+            return syscall_result_failure;
+        }
+        return fat32_rename(path, new_path) ? 0 : (ui64) -1;
+    }
+
+    if (number == syscall_write_file) {
+        if (argument2 > 0xffffffffu || argument4 > max_syscall_io ||
+            !user_range_mapped(active_program, argument3, argument4)) return syscall_result_failure;
+        return (ui64) fat32_write(path, (ui32) argument2, (const ui8 *) (uip) argument3,
+                                  (ui32) argument4);
+    }
+
     if (argument3 > 64 ||
         !user_range_mapped(active_program, argument2,
                            argument3 * sizeof(program_directory_entry_t))) {
         return syscall_result_failure;
     }
     fat32_directory_entry_t *entries = fat32_list_directory(path);
-    if (entries == 0) return (ui64) -1;
+    if (entries == 0 && !fat32_directory_exists(path)) return (ui64) -1;
     ui64 count = 0;
     program_directory_entry_t *user_entries = (program_directory_entry_t *) (uip) argument2;
     for (fat32_directory_entry_t *entry = entries; entry != 0 && count < argument3;
@@ -272,7 +299,7 @@ extern "C" [[noreturn]] void program_exception(ui64, ui64, ui64 code_selector) {
     __builtin_unreachable();
 }
 
-bool program_run(const char *path, const char *argument) {
+bool program_run(const char *path, const char *argument, const char *cwd) {
     fat32_file_t file;
     elf64_header_t header;
     if (path == 0 || !fat32_open(path, &file) || !read_exact(file, 0, &header, sizeof(header))) return false;
@@ -384,29 +411,57 @@ bool program_run(const char *path, const char *argument) {
     constexpr ui64 yield_stub_offset = 528;
     constexpr ui64 read_file_stub_offset = 544;
     constexpr ui64 list_directory_stub_offset = 560;
-    constexpr ui64 exit_stub_offset = 576;
+    constexpr ui64 create_file_stub_offset = 576;
+    constexpr ui64 create_directory_stub_offset = 592;
+    constexpr ui64 write_file_stub_offset = 608;
+    constexpr ui64 rename_path_stub_offset = 624;
+    constexpr ui64 remove_path_stub_offset = 640;
+    constexpr ui64 exit_stub_offset = 656;
     constexpr ui64 argument_offset = 128;
+    constexpr ui64 cwd_offset = 384;
     program_api_t *api = (program_api_t *) program.api;
     api->write_console = (void (*) (const char *, ui32)) (uip) (user_api_address + write_stub_offset);
     api->yield = (void (*) ()) (uip) (user_api_address + yield_stub_offset);
     api->argument = (const char *) (uip) (user_api_address + argument_offset);
+    api->cwd = (const char *) (uip) (user_api_address + cwd_offset);
     api->read_file = (i64 (*) (const char *, ui32, ui8 *, ui32))
         (uip) (user_api_address + read_file_stub_offset);
     api->list_directory = (i64 (*) (const char *, program_directory_entry_t *, ui32))
         (uip) (user_api_address + list_directory_stub_offset);
+    api->create_file = (i64 (*) (const char *)) (uip) (user_api_address + create_file_stub_offset);
+    api->create_directory = (i64 (*) (const char *))
+        (uip) (user_api_address + create_directory_stub_offset);
+    api->write_file = (i64 (*) (const char *, ui32, const ui8 *, ui32))
+        (uip) (user_api_address + write_file_stub_offset);
+    api->rename_path = (i64 (*) (const char *, const char *))
+        (uip) (user_api_address + rename_path_stub_offset);
+    api->remove_path = (i64 (*) (const char *)) (uip) (user_api_address + remove_path_stub_offset);
     const ui8 write_stub[] = {0xb8, 1, 0, 0, 0, 0xcd, 0x80, 0xc3};
     const ui8 yield_stub[] = {0xb8, 2, 0, 0, 0, 0xcd, 0x80, 0xc3};
     const ui8 read_file_stub[] = {0xb8, 3, 0, 0, 0, 0xcd, 0x80, 0xc3};
     const ui8 list_directory_stub[] = {0xb8, 4, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 create_file_stub[] = {0xb8, 5, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 create_directory_stub[] = {0xb8, 6, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 write_file_stub[] = {0xb8, 7, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 rename_path_stub[] = {0xb8, 8, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 remove_path_stub[] = {0xb8, 9, 0, 0, 0, 0xcd, 0x80, 0xc3};
     const ui8 exit_stub[] = {0x31, 0xc0, 0xcd, 0x80, 0xf4};
     for (ui64 index = 0; index < sizeof(write_stub); index++) program.api[write_stub_offset + index] = write_stub[index];
     for (ui64 index = 0; index < sizeof(yield_stub); index++) program.api[yield_stub_offset + index] = yield_stub[index];
     for (ui64 index = 0; index < sizeof(read_file_stub); index++) program.api[read_file_stub_offset + index] = read_file_stub[index];
     for (ui64 index = 0; index < sizeof(list_directory_stub); index++) program.api[list_directory_stub_offset + index] = list_directory_stub[index];
+    for (ui64 index = 0; index < sizeof(create_file_stub); index++) program.api[create_file_stub_offset + index] = create_file_stub[index];
+    for (ui64 index = 0; index < sizeof(create_directory_stub); index++) program.api[create_directory_stub_offset + index] = create_directory_stub[index];
+    for (ui64 index = 0; index < sizeof(write_file_stub); index++) program.api[write_file_stub_offset + index] = write_file_stub[index];
+    for (ui64 index = 0; index < sizeof(rename_path_stub); index++) program.api[rename_path_stub_offset + index] = rename_path_stub[index];
+    for (ui64 index = 0; index < sizeof(remove_path_stub); index++) program.api[remove_path_stub_offset + index] = remove_path_stub[index];
     for (ui64 index = 0; index < sizeof(exit_stub); index++) program.api[exit_stub_offset + index] = exit_stub[index];
     for (ui64 index = 0; argument != 0 && argument[index] != 0 && index + 1 < page_size - argument_offset;
          index++) {
         program.api[argument_offset + index] = argument[index];
+    }
+    for (ui64 index = 0; cwd != 0 && cwd[index] != 0 && index + 1 < page_size - cwd_offset; index++) {
+        program.api[cwd_offset + index] = cwd[index];
     }
 
     ui64 user_stack_top = user_stack_address + page_size - sizeof(ui64);

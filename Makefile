@@ -4,7 +4,7 @@ ASC  := clang
 LD   := ld.lld
 
 _FLAGS_COMMON := -m64 -fno-pic -fno-pie -nostdlib
-FLAGS_CPP     := $(_FLAGS_COMMON) -ffreestanding -fno-exceptions -mno-red-zone -fcf-protection=none -Wall -Wextra -I./include/
+FLAGS_CPP     := $(_FLAGS_COMMON) -ffreestanding -fno-exceptions -mno-red-zone -fcf-protection=none -Wall -Wextra -MMD -MP -I./include/
 FLAGS_AS      := $(_FLAGS_COMMON)
 FLAGS_LD      := -m elf_x86_64 -T linker.ld
 QEMUFLAGS     ?= -monitor stdio --no-reboot -m 2048 
@@ -17,6 +17,7 @@ GRUB_PC_DIR      := /usr/lib/grub/i386-pc
 CPP_SOURCES        := $(shell find kernel -name '*.cpp')
 ASM_SOURCES        := $(shell find -name '*.s')
 OBJECTS            := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(CPP_SOURCES)) $(patsubst %.s,$(BUILD_DIR)/%.o,$(ASM_SOURCES))
+DEPS               := $(OBJECTS:.o=.d)
 PROGRAMS_DIR       := programs
 PROGRAMS_BUILD_DIR := $(PROGRAMS_DIR)/build
 
@@ -73,3 +74,5 @@ clean:
 	@rm -rf $(BUILD_DIR)
 
 .PHONY: all programs run clean
+
+-include $(DEPS)

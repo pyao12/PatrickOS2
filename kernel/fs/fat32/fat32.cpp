@@ -16,14 +16,18 @@ static bool is_power_of_two(ui8 value) {
 }
 
 bool fat32_mount(fat32_filesystem_t *filesystem, fat32_read_sector_fn read_sector,
-                 void *read_context, ui32 partition_lba) {
+                 void *read_context, ui32 partition_lba,
+                 fat32_write_sector_fn write_sector, void *write_context) {
     if (filesystem == 0 || read_sector == 0) return false;
     filesystem->read_sector = 0;
     filesystem->read_context = 0;
+    filesystem->write_sector = 0;
+    filesystem->write_context = 0;
     filesystem->partition_lba = 0;
     filesystem->fat_start_lba = 0;
     filesystem->data_start_lba = 0;
     filesystem->sectors_per_fat = 0;
+    filesystem->fat_count = 0;
     filesystem->root_cluster = 0;
     filesystem->cluster_count = 0;
     filesystem->sectors_per_cluster = 0;
@@ -65,10 +69,13 @@ bool fat32_mount(fat32_filesystem_t *filesystem, fat32_read_sector_fn read_secto
 
     filesystem->read_sector = read_sector;
     filesystem->read_context = read_context;
+    filesystem->write_sector = write_sector;
+    filesystem->write_context = write_context;
     filesystem->partition_lba = partition_lba;
     filesystem->fat_start_lba = (ui32) fat_start_lba;
     filesystem->data_start_lba = (ui32) data_start_lba;
     filesystem->sectors_per_fat = sectors_per_fat;
+    filesystem->fat_count = fat_count;
     filesystem->root_cluster = root_cluster;
     filesystem->cluster_count = cluster_count;
     filesystem->sectors_per_cluster = sectors_per_cluster;
@@ -145,6 +152,32 @@ static bool ata_read_sector(void *context, ui32 lba, ui8 *buffer) {
     return true;
 }
 
+static bool ata_write_sector(void *context, ui32 lba, const ui8 *buffer) {
+    (void) context;
+    if (buffer == 0 || lba > 0x0fffffff || !ata_wait_ready()) return false;
+
+    ata_out8(ata_drive_port, (ui8) (0xe0 | ((lba >> 24) & 0x0f)));
+    ata_in8(ata_alt_status_port);
+    ata_in8(ata_alt_status_port);
+    ata_in8(ata_alt_status_port);
+    ata_in8(ata_alt_status_port);
+
+    ata_out8(ata_sector_count_port, 1);
+    ata_out8(ata_lba_low_port, (ui8) lba);
+    ata_out8(ata_lba_mid_port, (ui8) (lba >> 8));
+    ata_out8(ata_lba_high_port, (ui8) (lba >> 16));
+    ata_out8(ata_command_port, 0x30);
+    if (!ata_wait_data()) return false;
+
+    for (ui32 index = 0; index < fat32_sector_size / sizeof(ui16); index++) {
+        ui16 value = (ui16) buffer[index * 2] | ((ui16) buffer[index * 2 + 1] << 8);
+        asm ("outw %0, %1" : : "a" (value), "Nd" (ata_data_port));
+    }
+
+    ata_out8(ata_command_port, 0xe7);
+    return ata_wait_ready();
+}
+
 bool fat32_mount_primary_ata(fat32_filesystem_t *filesystem) {
     if (filesystem == 0) return false;
 
@@ -157,7 +190,7 @@ bool fat32_mount_primary_ata(fat32_filesystem_t *filesystem) {
 
         ui32 partition_lba = read_le32(partition + 8);
         if (partition_lba == 0) return false;
-        return fat32_mount(filesystem, ata_read_sector, 0, partition_lba);
+        return fat32_mount(filesystem, ata_read_sector, 0, partition_lba, ata_write_sector, 0);
     }
 
     return false;
@@ -171,6 +204,30 @@ bool fat32_open(const char *path, fat32_file_t *file) {
     return fat32_open(&primary_filesystem, path, file);
 }
 
+bool fat32_directory_exists(const char *path) {
+    return fat32_directory_exists(&primary_filesystem, path);
+}
+
 fat32_directory_entry_t *fat32_list_directory(const char *path) {
     return fat32_list_directory(&primary_filesystem, path);
+}
+
+bool fat32_create_file(const char *path) {
+    return fat32_create_file(&primary_filesystem, path);
+}
+
+bool fat32_create_directory(const char *path) {
+    return fat32_create_directory(&primary_filesystem, path);
+}
+
+i64 fat32_write(const char *path, ui32 offset, const ui8 *buffer, ui32 size) {
+    return fat32_write(&primary_filesystem, path, offset, buffer, size);
+}
+
+bool fat32_rename(const char *path, const char *new_path) {
+    return fat32_rename(&primary_filesystem, path, new_path);
+}
+
+bool fat32_remove(const char *path) {
+    return fat32_remove(&primary_filesystem, path);
 }
