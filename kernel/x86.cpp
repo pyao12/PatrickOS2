@@ -3,9 +3,9 @@
 namespace {
 
 constexpr ui16 kernel_code_selector = 0x08;
-constexpr ui16 tss_selector = 0x28;
-constexpr ui8 interrupt_gate = 0x8e;
-constexpr ui8 user_interrupt_gate = 0xee;
+constexpr ui16 tss_selector         = 0x28;
+constexpr ui8 interrupt_gate        = 0x8e;
+constexpr ui8 user_interrupt_gate   = 0xee;
 
 struct table_descriptor_t {
     ui16 limit;
@@ -37,20 +37,20 @@ alignas(16) idt_entry_t idt[256];
 alignas(16) ui8 double_fault_stack[16384];
 
 extern "C" void *x86_exception_stubs[32];
-extern "C" void x86_syscall_stub();
+extern "C" void x86_syscall_stub(); // 在 user.s 中定义
 extern "C" void x86_load_tables(const table_descriptor_t *, const table_descriptor_t *, ui16);
 extern "C" bool x86_enter_user_asm(ui64, ui64, ui64, ui64);
-extern "C" [[noreturn]] void x86_leave_user_asm(bool);
+extern "C" [[noreturn]] void x86_leave_user_asm(bool); // user.s
 
 void set_idt_entry(ui8 vector, void *handler, ui8 attributes, ui8 ist = 0) {
     ui64 address = (ui64) (uip) handler;
-    idt[vector].offset_low = (ui16) address;
-    idt[vector].selector = kernel_code_selector;
-    idt[vector].ist = ist;
-    idt[vector].attributes = attributes;
+    idt[vector].offset_low    = (ui16) address;
+    idt[vector].selector      = kernel_code_selector;
+    idt[vector].ist           = ist;
+    idt[vector].attributes    = attributes;
     idt[vector].offset_middle = (ui16) (address >> 16);
-    idt[vector].offset_high = (ui32) (address >> 32);
-    idt[vector].reserved = 0;
+    idt[vector].offset_high   = (ui32) (address >> 32);
+    idt[vector].reserved      = 0;
 }
 
 }
