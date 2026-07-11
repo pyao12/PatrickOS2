@@ -3,18 +3,19 @@
 #include <memory.h>
 #include <scheduler.h>
 #include <fs/fat32.h>
-
+#include <input.h>
 #include <algo/convert.h>
 
-constexpr int max_line      = 48;  // 768 / 16
-constexpr int line_max_char = 160; // 1280 / 8
+constexpr int max_line      = 48;
+constexpr int line_max_char = 160;
+constexpr int max_cmd_len   = 128;
+constexpr int max_path_len  = 256;
 constexpr ui32 fat32_directory_attribute = 0x10;
-constexpr ui32 fat32_demo_path_size = 256;
-constexpr ui32 fat32_demo_max_depth = 16;
 
-ui16 current_line = 0, current_char = 0;
+static ui16 current_line = 0, current_char = 0;
+static char cwd[max_path_len] = "/";
 
-void clear_screen() {
+static void clear_screen() {
     for (int x = 0; x <= 1280; x++) {
         for (int y = 0; y < 768; y++) {
             draw_pixel(x, y, 0);
@@ -27,7 +28,6 @@ static void prepare_cursor() {
         current_char = 0;
         current_line++;
     }
-
     if (current_line >= max_line) {
         clear_screen();
         current_line = 0;
@@ -35,11 +35,8 @@ static void prepare_cursor() {
     }
 }
 
-void write_console(const char* str, ui32 color = COLOR_WHITE) {
-    if (str == 0) {
-        return;
-    }
-
+void write_console(const char* str, ui32 color) {
+    if (str == 0) return;
     for (const char* cursor = str; *cursor != 0; cursor++) {
         if (*cursor == '\n') {
             current_char = 0;
@@ -57,100 +54,255 @@ void write_console(const char* str, ui32 color = COLOR_WHITE) {
     }
 }
 
-static void write_memory_size(const char *label, ui64 size) {
-    char buffer[21];
-    write_console(label);
-    write_console(int2str(size / (1024 * 1024), buffer));
-    write_console(" MiB\n");
+static void write_prompt() {
+    write_console("[", COLOR_GRAY);
+    write_console(cwd, COLOR_CYAN);
+    write_console("] ", COLOR_GRAY);
 }
 
-static void readfile_demo() {
-    fat32_file_t file;
-    char content[1024];
+static ui32 str_len(const char *s) {
+    ui32 len = 0;
+    while (s[len]) len++;
+    return len;
+}
 
-    if (!fat32_open("/HELLO.TXT", &file)) {
-        write_console("FAT32 HELLO.TXT not found\n");
+static bool str_eq(const char *a, const char *b) {
+    while (*a && *b) {
+        if (*a != *b) return false;
+        a++;
+        b++;
+    }
+    return *a == *b;
+}
+
+static void str_copy(char *dst, const char *src, ui32 max) {
+    ui32 i = 0;
+    while (src[i] && i + 1 < max) {
+        dst[i] = src[i];
+        i++;
+    }
+    dst[i] = 0;
+}
+
+static void str_concat(char *dst, const char *a, const char *b, ui32 max) {
+    ui32 i = 0;
+    while (a[i] && i + 1 < max) {
+        dst[i] = a[i];
+        i++;
+    }
+    ui32 j = 0;
+    while (b[j] && i + 1 < max) {
+        dst[i++] = b[j++];
+    }
+    dst[i] = 0;
+}
+
+static void resolve_path(const char *in, char *out, ui32 max) {
+    char segs[16][32];
+    ui32 count = 0;
+
+    const char *p = in;
+    if (*p == '/') p++;
+
+    while (*p && count < 16) {
+        ui32 len = 0;
+        while (*p && *p != '/' && len < 31) {
+            segs[count][len++] = *p++;
+        }
+        segs[count][len] = 0;
+        if (len > 0) {
+            if (str_eq(segs[count], ".")) {
+            } else if (str_eq(segs[count], "..")) {
+                if (count > 0) count--;
+            } else {
+                count++;
+            }
+        }
+        if (*p == '/') p++;
+    }
+
+    out[0] = '/';
+    ui32 pos = 1;
+    for (ui32 i = 0; i < count; i++) {
+        ui32 slen = str_len(segs[i]);
+        if (pos + slen + 2 > max) break;
+        for (ui32 j = 0; j < slen; j++) out[pos++] = segs[i][j];
+        if (i + 1 < count) out[pos++] = '/';
+    }
+    out[pos] = 0;
+}
+
+static void cmd_help() {
+    write_console("Available commands:\n", COLOR_WHITE);
+    write_console("  help  - show this message\n", COLOR_GRAY);
+    write_console("  cd    - change directory\n", COLOR_GRAY);
+    write_console("  ls    - list directory\n", COLOR_GRAY);
+    write_console("  cat   - display file contents\n", COLOR_GRAY);
+    write_console("  clear - clear screen\n", COLOR_GRAY);
+}
+
+static void cmd_cd(const char *arg) {
+    if (arg[0] == 0) {
+        str_copy(cwd, "/", max_path_len);
         return;
     }
 
-    i64 bytes_read = fat32_read(&file, 0, (ui8 *) content, sizeof(content) - 1);
+    char raw[max_path_len];
+    if (arg[0] == '/') {
+        str_copy(raw, arg, max_path_len);
+    } else {
+        str_concat(raw, cwd, arg, max_path_len);
+    }
+
+    char path[max_path_len];
+    resolve_path(raw, path, max_path_len);
+
+    fat32_directory_entry_t *entries = fat32_list_directory(path);
+    if (entries == 0) {
+        write_console("cd: no such directory: ", COLOR_RED);
+        write_console(arg, COLOR_RED);
+        write_console("\n", COLOR_RED);
+        return;
+    }
+    fat32_free_directory_list(entries);
+    str_copy(cwd, path, max_path_len);
+    ui32 cwd_len = str_len(cwd);
+    if (cwd_len > 1 && cwd[cwd_len - 1] != '/') {
+        cwd[cwd_len] = '/';
+        cwd[cwd_len + 1] = 0;
+    }
+}
+
+static void cmd_ls() {
+    fat32_directory_entry_t *entries = fat32_list_directory(cwd);
+    if (entries == 0) {
+        write_console("ls: cannot list directory\n", COLOR_RED);
+        return;
+    }
+
+    for (fat32_directory_entry_t *entry = entries; entry; entry = entry->next) {
+        bool is_dir = (entry->attributes & fat32_directory_attribute) != 0;
+        write_console(entry->name, is_dir ? COLOR_CYAN : COLOR_WHITE);
+        write_console(is_dir ? "/  " : "  ", COLOR_WHITE);
+    }
+    write_console("\n", COLOR_WHITE);
+    fat32_free_directory_list(entries);
+}
+
+static void cmd_cat(const char *arg) {
+    if (arg[0] == 0) {
+        write_console("cat: missing file argument\n", COLOR_RED);
+        return;
+    }
+
+    char raw[max_path_len];
+    if (arg[0] == '/') {
+        str_copy(raw, arg, max_path_len);
+    } else {
+        str_concat(raw, cwd, arg, max_path_len);
+    }
+
+    char path[max_path_len];
+    resolve_path(raw, path, max_path_len);
+
+    fat32_file_t file;
+    if (!fat32_open(path, &file)) {
+        write_console("cat: ", COLOR_RED);
+        write_console(arg, COLOR_RED);
+        write_console(": no such file\n", COLOR_RED);
+        return;
+    }
+
+    char content[4096];
+    i64 bytes_read = fat32_read(&file, 0, (ui8 *)content, sizeof(content) - 1);
     if (bytes_read < 0) {
-        write_console("FAT32 HELLO.TXT read failed\n");
+        write_console("cat: read error\n", COLOR_RED);
         return;
     }
 
     content[bytes_read] = 0;
-    write_console("\nFAT32 HELLO.TXT:\n");
-    write_console(content);
-    write_console("\n");
+    write_console(content, COLOR_WHITE);
+    write_console("\n", COLOR_WHITE);
 }
 
-static bool fat32_demo_make_path(const char *parent, const char *name,
-                                 char path[fat32_demo_path_size]) {
-    ui32 length = 0;
-    while (parent[length] != 0) {
-        if (length + 1 >= fat32_demo_path_size) return false;
-        path[length] = parent[length];
-        length++;
-    }
-
-    if (length == 0 || path[length - 1] != '/') {
-        if (length + 1 >= fat32_demo_path_size) return false;
-        path[length++] = '/';
-    }
-
-    for (ui32 index = 0; name[index] != 0; index++) {
-        if (length + 1 >= fat32_demo_path_size) return false;
-        path[length++] = name[index];
-    }
-    path[length] = 0;
-    return true;
+static void cmd_clear() {
+    clear_screen();
+    current_line = 0;
+    current_char = 0;
 }
 
-static void fat32_demo_wc_directory(const char *path, ui32 depth) {
-    fat32_directory_entry_t *entries = fat32_list_directory(path);
-    for (fat32_directory_entry_t *entry = entries; entry != 0; entry = entry->next) {
-        for (ui32 indent = 0; indent < depth; indent++) write_console("  ");
-
-        bool is_directory = (entry->attributes & fat32_directory_attribute) != 0;
-        write_console(entry->name);
-        write_console(is_directory ? "/\n" : "\n");
-
-        if (!is_directory) continue;
-        if (depth >= fat32_demo_max_depth) {
-            for (ui32 indent = 0; indent <= depth; indent++) write_console("  ");
-            write_console("<maximum depth reached>\n");
-            continue;
-        }
-
-        char child_path[fat32_demo_path_size];
-        if (!fat32_demo_make_path(path, entry->name, child_path)) {
-            for (ui32 indent = 0; indent <= depth; indent++) write_console("  ");
-            write_console("<path too long>\n");
-            continue;
-        }
-        fat32_demo_wc_directory(child_path, depth + 1);
+static void parse_and_exec(char *cmd) {
+    while (*cmd == ' ') cmd++;
+    ui32 len = str_len(cmd);
+    while (len > 0 && cmd[len - 1] == ' ') {
+        cmd[--len] = 0;
     }
 
-    fat32_free_directory_list(entries);
-}
+    if (len == 0) return;
 
-static void readdir_demo() {
-    write_console("\nList of / (recursive):\n");
-    fat32_demo_wc_directory("/", 0);
-    write_console("\n");
+    char *arg = cmd;
+    while (*arg && *arg != ' ') arg++;
+    if (*arg == ' ') {
+        *arg = 0;
+        arg++;
+        while (*arg == ' ') arg++;
+    } else {
+        arg = cmd + len;
+    }
+
+    if (str_eq(cmd, "help")) {
+        cmd_help();
+    } else if (str_eq(cmd, "cd")) {
+        cmd_cd(arg);
+    } else if (str_eq(cmd, "ls")) {
+        cmd_ls();
+    } else if (str_eq(cmd, "cat")) {
+        cmd_cat(arg);
+    } else if (str_eq(cmd, "clear")) {
+        cmd_clear();
+    } else {
+        write_console(cmd, COLOR_RED);
+        write_console(": command not found\n", COLOR_RED);
+    }
 }
 
 void console_main(void *arg) {
     (void) arg;
-
     clear_screen();
-    write_console("Welcome to PatrickOS 2 Console!\n");
-    write_memory_size("Physical address range: ", memory_physical_size());
-    write_memory_size("Usable physical memory: ", memory_usable_size());
-    write_memory_size("Allocator free memory: ", memory_free_size());
-    readfile_demo();
-    readdir_demo();
+    write_console("PatrickOS 2 Shell\n", COLOR_GREEN);
+    write_console("Type 'help' for available commands.\n\n", COLOR_GRAY);
 
-    while (true) scheduler_yield();
+    char line_buf[max_cmd_len];
+    int line_pos = 0;
+
+    write_prompt();
+
+    while (true) {
+        char c;
+        if (!input_buffer_pop(&global_input_buffer, &c)) {
+            scheduler_yield();
+            continue;
+        }
+
+        if (c == '\n') {
+            write_console("\n", COLOR_WHITE);
+            line_buf[line_pos] = 0;
+            parse_and_exec(line_buf);
+            line_pos = 0;
+            write_prompt();
+        } else if (c == 0x08) {
+            if (line_pos > 0) {
+                line_pos--;
+                current_char--;
+                prepare_cursor();
+                print_char(' ', current_char * 8, current_line * 16, COLOR_WHITE);
+            }
+        } else if (c >= ' ' && c < 127 && line_pos < max_cmd_len - 1) {
+            line_buf[line_pos++] = c;
+            char buf[2] = { c, 0 };
+            write_console(buf, COLOR_WHITE);
+        }
+
+        scheduler_yield();
+    }
 }

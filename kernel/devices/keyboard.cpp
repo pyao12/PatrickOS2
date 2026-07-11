@@ -2,6 +2,7 @@
 #include <scheduler.h>
 #include <graphics/colors.h>
 #include <console.h>
+#include <input.h>
 
 static inline ui8 inb(ui16 port) {
     ui8 value;
@@ -43,7 +44,6 @@ static bool is_letter(ui8 sc) {
 
 void keyboard_main(void *arg) {
     (void) arg;
-    write_console("Keyboard driver ready\n");
 
     bool shift = false;
     bool capslock = false;
@@ -60,6 +60,8 @@ void keyboard_main(void *arg) {
                     shift = true;
                 } else if (scancode == 0x3A) {
                     capslock = !capslock;
+                } else if (scancode == 0x0E) {
+                    input_buffer_push(&global_input_buffer, 0x08);
                 } else {
                     char c;
                     if (is_letter(scancode)) {
@@ -69,8 +71,7 @@ void keyboard_main(void *arg) {
                         c = shift ? sc1_shifted[scancode] : sc1_normal[scancode];
                     }
                     if (c != 0) {
-                        char buf[2] = { c, 0 };
-                        write_console(buf);
+                        input_buffer_push(&global_input_buffer, c);
                     }
                 }
             }
