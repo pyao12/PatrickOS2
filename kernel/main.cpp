@@ -5,6 +5,7 @@
 #include <memory.h>
 #include <scheduler.h>
 #include <devices/keyboard.h>
+#include <devices/ps2mouse.h>
 #include <input.h>
 #include <x86.h>
 
@@ -20,6 +21,7 @@ extern "C" void kernel_main(ui32 mb_info_addr) {
     scheduler_init();
     if (scheduler_create_task(console_main, 0) < 0) halt();
     if (scheduler_create_task(keyboard_main, 0) < 0) halt();
+    if (ps2mouse_init() && scheduler_create_task(ps2mouse_main, 0) < 0) halt();
 
     scheduler_run();
     halt();

@@ -50,7 +50,7 @@ void keyboard_main(void *arg) {
 
     while (true) {
         ui8 status = inb(0x64);
-        if (status & 0x01) {
+        if ((status & 0x21) == 0x01) {
             ui8 scancode = inb(0x60);
             if (scancode & 0x80) {
                 ui8 brk = scancode & 0x7F;
