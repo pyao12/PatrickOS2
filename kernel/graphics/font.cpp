@@ -15,7 +15,7 @@ void print_char(char c, ui32 posx, ui32 posy, ui32 color) {
     }
 }
 
-void print_str(const char* str, ui32 posx, ui32 posy, ui32 color) {
+void print_str(const char *str, ui32 posx, ui32 posy, ui32 color) {
     ui32 cursorx = posx, cursory = posy;
     for (const char *p = str; *p != 0; p++) {
         if (*p == '\n') {

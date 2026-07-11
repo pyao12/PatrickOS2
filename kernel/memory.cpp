@@ -2,10 +2,10 @@
 
 #include <graphics/basic.h>
 
-constexpr ui64 page_size = 4096;
-constexpr ui64 page_mask = page_size - 1;
-constexpr ui64 physical_memory_limit = 0x0000800000000000ULL;
-constexpr ui64 allocation_magic = 0x504f53324d454d31ULL;
+constexpr ui64 page_size              = 4096;
+constexpr ui64 page_mask              = page_size - 1;
+constexpr ui64 physical_memory_limit  = 0x0000800000000000ULL;
+constexpr ui64 allocation_magic       = 0x504f53324d454d31ULL;
 
 struct mb_module_t {
     ui32 mod_start;
@@ -19,11 +19,11 @@ struct allocation_header_t {
     ui64 magic;
 };
 
-static ui8 *page_bitmap = 0;
-static ui64 page_count = 0;
+static ui8 *page_bitmap       = 0;
+static ui64 page_count        = 0;
 static ui64 usable_page_count = 0;
-static ui64 free_page_count = 0;
-static bool memory_ready = false;
+static ui64 free_page_count   = 0;
+static bool memory_ready      = false;
 
 extern "C" ui8 kernel_start;
 extern "C" ui8 kernel_end;

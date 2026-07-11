@@ -19,19 +19,19 @@ bool fat32_mount(fat32_filesystem_t *filesystem, fat32_read_sector_fn read_secto
                  void *read_context, ui32 partition_lba,
                  fat32_write_sector_fn write_sector, void *write_context) {
     if (filesystem == 0 || read_sector == 0) return false;
-    filesystem->read_sector = 0;
-    filesystem->read_context = 0;
-    filesystem->write_sector = 0;
-    filesystem->write_context = 0;
-    filesystem->partition_lba = 0;
-    filesystem->fat_start_lba = 0;
-    filesystem->data_start_lba = 0;
-    filesystem->sectors_per_fat = 0;
-    filesystem->fat_count = 0;
-    filesystem->root_cluster = 0;
-    filesystem->cluster_count = 0;
+    filesystem->read_sector        = 0;
+    filesystem->read_context        = 0;
+    filesystem->write_sector       = 0;
+    filesystem->write_context       = 0;
+    filesystem->partition_lba      = 0;
+    filesystem->fat_start_lba      = 0;
+    filesystem->data_start_lba     = 0;
+    filesystem->sectors_per_fat    = 0;
+    filesystem->fat_count          = 0;
+    filesystem->root_cluster       = 0;
+    filesystem->cluster_count      = 0;
     filesystem->sectors_per_cluster = 0;
-    filesystem->mounted = false;
+    filesystem->mounted            = false;
 
     ui8 boot_sector[fat32_sector_size];
     if (!read_sector(read_context, partition_lba, boot_sector)) return false;
@@ -39,14 +39,14 @@ bool fat32_mount(fat32_filesystem_t *filesystem, fat32_read_sector_fn read_secto
         return false;
     }
 
-    ui8 sectors_per_cluster = boot_sector[13];
+    ui8  sectors_per_cluster  = boot_sector[13];
     ui16 reserved_sector_count = read_le16(boot_sector + 14);
-    ui8 fat_count = boot_sector[16];
-    ui16 root_entry_count = read_le16(boot_sector + 17);
-    ui16 fat16_sectors = read_le16(boot_sector + 22);
-    ui32 total_sectors = read_le16(boot_sector + 19);
-    ui32 sectors_per_fat = read_le32(boot_sector + 36);
-    ui32 root_cluster = read_le32(boot_sector + 44);
+    ui8  fat_count            = boot_sector[16];
+    ui16 root_entry_count     = read_le16(boot_sector + 17);
+    ui16 fat16_sectors        = read_le16(boot_sector + 22);
+    ui32 total_sectors        = read_le16(boot_sector + 19);
+    ui32 sectors_per_fat      = read_le32(boot_sector + 36);
+    ui32 root_cluster         = read_le32(boot_sector + 44);
     if (total_sectors == 0) total_sectors = read_le32(boot_sector + 32);
 
     if (!is_power_of_two(sectors_per_cluster) || sectors_per_cluster > 128 ||
@@ -67,31 +67,31 @@ bool fat32_mount(fat32_filesystem_t *filesystem, fat32_read_sector_fn read_secto
         return false;
     }
 
-    filesystem->read_sector = read_sector;
-    filesystem->read_context = read_context;
-    filesystem->write_sector = write_sector;
-    filesystem->write_context = write_context;
-    filesystem->partition_lba = partition_lba;
-    filesystem->fat_start_lba = (ui32) fat_start_lba;
-    filesystem->data_start_lba = (ui32) data_start_lba;
-    filesystem->sectors_per_fat = sectors_per_fat;
-    filesystem->fat_count = fat_count;
-    filesystem->root_cluster = root_cluster;
-    filesystem->cluster_count = cluster_count;
+    filesystem->read_sector        = read_sector;
+    filesystem->read_context        = read_context;
+    filesystem->write_sector       = write_sector;
+    filesystem->write_context       = write_context;
+    filesystem->partition_lba      = partition_lba;
+    filesystem->fat_start_lba      = (ui32) fat_start_lba;
+    filesystem->data_start_lba     = (ui32) data_start_lba;
+    filesystem->sectors_per_fat    = sectors_per_fat;
+    filesystem->fat_count          = fat_count;
+    filesystem->root_cluster       = root_cluster;
+    filesystem->cluster_count      = cluster_count;
     filesystem->sectors_per_cluster = sectors_per_cluster;
-    filesystem->mounted = true;
+    filesystem->mounted            = true;
     return true;
 }
 
-static constexpr ui16 ata_data_port = 0x1f0;
+static constexpr ui16 ata_data_port        = 0x1f0;
 static constexpr ui16 ata_sector_count_port = 0x1f2;
-static constexpr ui16 ata_lba_low_port = 0x1f3;
-static constexpr ui16 ata_lba_mid_port = 0x1f4;
-static constexpr ui16 ata_lba_high_port = 0x1f5;
-static constexpr ui16 ata_drive_port = 0x1f6;
-static constexpr ui16 ata_status_port = 0x1f7;
-static constexpr ui16 ata_command_port = 0x1f7;
-static constexpr ui16 ata_alt_status_port = 0x3f6;
+static constexpr ui16 ata_lba_low_port     = 0x1f3;
+static constexpr ui16 ata_lba_mid_port     = 0x1f4;
+static constexpr ui16 ata_lba_high_port    = 0x1f5;
+static constexpr ui16 ata_drive_port       = 0x1f6;
+static constexpr ui16 ata_status_port      = 0x1f7;
+static constexpr ui16 ata_command_port     = 0x1f7;
+static constexpr ui16 ata_alt_status_port  = 0x3f6;
 
 static ui8 ata_in8(ui16 port) {
     ui8 value;

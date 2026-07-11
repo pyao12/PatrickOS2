@@ -6,4 +6,4 @@
 #include "__fontdat.h"
 
 void print_char(char c, ui32 posx, ui32 posy, ui32 color);
-void print_str(const char* str, ui32 posx, ui32 posy, ui32 color);
+void print_str(const char *str, ui32 posx, ui32 posy, ui32 color);

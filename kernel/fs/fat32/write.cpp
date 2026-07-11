@@ -2,10 +2,10 @@
 
 namespace {
 
-constexpr ui32 fat32_end_of_chain = 0x0fffffff;
-constexpr ui8 fat32_attribute_directory = 0x10;
-constexpr ui8 fat32_attribute_archive = 0x20;
-constexpr ui8 fat32_attribute_long_name = 0x0f;
+constexpr ui32 fat32_end_of_chain       = 0x0fffffff;
+constexpr ui8  fat32_attribute_directory = 0x10;
+constexpr ui8  fat32_attribute_archive   = 0x20;
+constexpr ui8  fat32_attribute_long_name  = 0x0f;
 
 struct fat32_entry_location_t {
     ui32 cluster;

@@ -2,7 +2,7 @@
 
 #include <common.h>
 
-inline char* int2str(ui64 value, char buffer[21]) {
+inline char *int2str(ui64 value, char buffer[21]) {
     int index = 20;
     buffer[index] = '\0';
 

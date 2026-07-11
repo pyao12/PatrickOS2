@@ -7,48 +7,48 @@
 
 namespace {
 
-constexpr ui8 elf_class_64 = 2;
-constexpr ui8 elf_data_little_endian = 1;
-constexpr ui8 elf_version_current = 1;
-constexpr ui16 elf_type_dynamic = 3;
-constexpr ui16 elf_machine_x86_64 = 62;
-constexpr ui32 elf_program_load = 1;
-constexpr ui32 elf_program_dynamic = 2;
-constexpr ui32 elf_program_interpreter = 3;
-constexpr ui32 elf_program_tls = 7;
-constexpr ui32 elf_segment_executable = 1;
-constexpr ui32 elf_segment_writable = 2;
-constexpr ui64 elf_dynamic_needed = 1;
-constexpr ui64 elf_dynamic_rela = 7;
-constexpr ui64 elf_dynamic_rel = 17;
-constexpr ui64 elf_dynamic_jmprel = 23;
-constexpr ui64 page_size = 4096;
-constexpr ui64 max_program_size = 16 * 1024 * 1024;
-constexpr ui16 max_program_headers = 64;
-constexpr ui64 user_base = 0x0000400000000000ULL;
-constexpr ui64 user_stack_address = user_base + max_program_size + page_size;
-constexpr ui64 user_api_address = user_stack_address + 2 * page_size;
-constexpr ui64 page_address_mask = 0x000ffffffffff000ULL;
-constexpr ui64 page_present = 1;
-constexpr ui64 page_writable = 2;
-constexpr ui64 page_user = 4;
-constexpr ui64 page_no_execute = 1ULL << 63;
-constexpr ui64 syscall_exit = 0;
-constexpr ui64 syscall_write = 1;
-constexpr ui64 syscall_yield = 2;
-constexpr ui64 syscall_read_file = 3;
-constexpr ui64 syscall_list_directory = 4;
-constexpr ui64 syscall_create_file = 5;
-constexpr ui64 syscall_create_directory = 6;
-constexpr ui64 syscall_write_file = 7;
-constexpr ui64 syscall_rename_path = 8;
-constexpr ui64 syscall_remove_path = 9;
-constexpr ui64 syscall_result_exit = 0x100;
-constexpr ui64 syscall_result_failure = 0x101;
-constexpr ui64 max_syscall_text = 1024;
-constexpr ui64 max_syscall_path = 256;
-constexpr ui64 max_syscall_io = 4096;
-constexpr ui64 max_page_tables = 16;
+constexpr ui8  elf_class_64              = 2;
+constexpr ui8  elf_data_little_endian    = 1;
+constexpr ui8  elf_version_current       = 1;
+constexpr ui16 elf_type_dynamic          = 3;
+constexpr ui16 elf_machine_x86_64        = 62;
+constexpr ui32 elf_program_load          = 1;
+constexpr ui32 elf_program_dynamic       = 2;
+constexpr ui32 elf_program_interpreter   = 3;
+constexpr ui32 elf_program_tls           = 7;
+constexpr ui32 elf_segment_executable    = 1;
+constexpr ui32 elf_segment_writable      = 2;
+constexpr ui64 elf_dynamic_needed        = 1;
+constexpr ui64 elf_dynamic_rela          = 7;
+constexpr ui64 elf_dynamic_rel           = 17;
+constexpr ui64 elf_dynamic_jmprel        = 23;
+constexpr ui64 page_size                 = 4096;
+constexpr ui64 max_program_size          = 16 * 1024 * 1024;
+constexpr ui16 max_program_headers       = 64;
+constexpr ui64 user_base                 = 0x0000400000000000ULL;
+constexpr ui64 user_stack_address        = user_base + max_program_size + page_size;
+constexpr ui64 user_api_address          = user_stack_address + 2 * page_size;
+constexpr ui64 page_address_mask         = 0x000ffffffffff000ULL;
+constexpr ui64 page_present              = 1;
+constexpr ui64 page_writable             = 2;
+constexpr ui64 page_user                 = 4;
+constexpr ui64 page_no_execute           = 1ULL << 63;
+constexpr ui64 syscall_exit              = 0;
+constexpr ui64 syscall_write             = 1;
+constexpr ui64 syscall_yield             = 2;
+constexpr ui64 syscall_read_file         = 3;
+constexpr ui64 syscall_list_directory    = 4;
+constexpr ui64 syscall_create_file       = 5;
+constexpr ui64 syscall_create_directory  = 6;
+constexpr ui64 syscall_write_file        = 7;
+constexpr ui64 syscall_rename_path       = 8;
+constexpr ui64 syscall_remove_path       = 9;
+constexpr ui64 syscall_result_exit       = 0x100;
+constexpr ui64 syscall_result_failure    = 0x101;
+constexpr ui64 max_syscall_text          = 1024;
+constexpr ui64 max_syscall_path          = 256;
+constexpr ui64 max_syscall_io            = 4096;
+constexpr ui64 max_page_tables           = 16;
 
 struct elf64_header_t {
     ui8 ident[16];
@@ -314,8 +314,8 @@ bool program_run(const char *path, const char *argument, const char *cwd) {
         !range_fits(header.program_header_offset,
                     (ui64) header.program_header_count * sizeof(elf64_program_header_t), file.size)) return false;
 
-    ui64 lowest_address = (ui64) -1;
-    ui64 highest_address = 0;
+    ui64 lowest_address      = (ui64) -1;
+    ui64 highest_address     = 0;
     bool entry_is_executable = false;
     for (ui16 index = 0; index < header.program_header_count; index++) {
         elf64_program_header_t program_header;
@@ -350,12 +350,12 @@ bool program_run(const char *path, const char *argument, const char *cwd) {
         highest_address - lowest_address > max_program_size) return false;
 
     program_address_space_t program;
-    program.pml4 = 0;
-    program.image = 0;
-    program.image_pages = 0;
-    program.stack = 0;
-    program.api = 0;
-    program.page_table_count = 0;
+    program.pml4              = 0;
+    program.image             = 0;
+    program.image_pages       = 0;
+    program.stack             = 0;
+    program.api               = 0;
+    program.page_table_count  = 0;
     ui64 image_size = highest_address - lowest_address;
     program.image_pages = image_size / page_size;
     program.image = (ui8 *) memory_alloc_pages(program.image_pages);
@@ -407,18 +407,18 @@ bool program_run(const char *path, const char *argument, const char *cwd) {
         }
     }
 
-    constexpr ui64 write_stub_offset = 512;
-    constexpr ui64 yield_stub_offset = 528;
-    constexpr ui64 read_file_stub_offset = 544;
-    constexpr ui64 list_directory_stub_offset = 560;
-    constexpr ui64 create_file_stub_offset = 576;
-    constexpr ui64 create_directory_stub_offset = 592;
-    constexpr ui64 write_file_stub_offset = 608;
-    constexpr ui64 rename_path_stub_offset = 624;
-    constexpr ui64 remove_path_stub_offset = 640;
-    constexpr ui64 exit_stub_offset = 656;
-    constexpr ui64 argument_offset = 128;
-    constexpr ui64 cwd_offset = 384;
+    constexpr ui64 write_stub_offset              = 512;
+    constexpr ui64 yield_stub_offset              = 528;
+    constexpr ui64 read_file_stub_offset          = 544;
+    constexpr ui64 list_directory_stub_offset     = 560;
+    constexpr ui64 create_file_stub_offset        = 576;
+    constexpr ui64 create_directory_stub_offset   = 592;
+    constexpr ui64 write_file_stub_offset         = 608;
+    constexpr ui64 rename_path_stub_offset        = 624;
+    constexpr ui64 remove_path_stub_offset        = 640;
+    constexpr ui64 exit_stub_offset               = 656;
+    constexpr ui64 argument_offset                = 128;
+    constexpr ui64 cwd_offset                     = 384;
     program_api_t *api = (program_api_t *) program.api;
     api->write_console = (void (*) (const char *, ui32)) (uip) (user_api_address + write_stub_offset);
     api->yield = (void (*) ()) (uip) (user_api_address + yield_stub_offset);
@@ -436,16 +436,16 @@ bool program_run(const char *path, const char *argument, const char *cwd) {
     api->rename_path = (i64 (*) (const char *, const char *))
         (uip) (user_api_address + rename_path_stub_offset);
     api->remove_path = (i64 (*) (const char *)) (uip) (user_api_address + remove_path_stub_offset);
-    const ui8 write_stub[] = {0xb8, 1, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 yield_stub[] = {0xb8, 2, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 read_file_stub[] = {0xb8, 3, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 list_directory_stub[] = {0xb8, 4, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 create_file_stub[] = {0xb8, 5, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 create_directory_stub[] = {0xb8, 6, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 write_file_stub[] = {0xb8, 7, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 rename_path_stub[] = {0xb8, 8, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 remove_path_stub[] = {0xb8, 9, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 exit_stub[] = {0x31, 0xc0, 0xcd, 0x80, 0xf4};
+    const ui8 write_stub[]              = {0xb8, 1, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 yield_stub[]              = {0xb8, 2, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 read_file_stub[]          = {0xb8, 3, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 list_directory_stub[]     = {0xb8, 4, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 create_file_stub[]        = {0xb8, 5, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 create_directory_stub[]   = {0xb8, 6, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 write_file_stub[]         = {0xb8, 7, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 rename_path_stub[]        = {0xb8, 8, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 remove_path_stub[]        = {0xb8, 9, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 exit_stub[]               = {0x31, 0xc0, 0xcd, 0x80, 0xf4};
     for (ui64 index = 0; index < sizeof(write_stub); index++) program.api[write_stub_offset + index] = write_stub[index];
     for (ui64 index = 0; index < sizeof(yield_stub); index++) program.api[yield_stub_offset + index] = yield_stub[index];
     for (ui64 index = 0; index < sizeof(read_file_stub); index++) program.api[read_file_stub_offset + index] = read_file_stub[index];

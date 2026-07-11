@@ -5,8 +5,8 @@ alignas(16) \
 static ui8 scheduler_task_stacks[scheduler_max_tasks][scheduler_stack_size];
 static scheduler_task_t scheduler_tasks[scheduler_max_tasks];
 static scheduler_context_t scheduler_context;
-static int scheduler_current_task = -1;
-static int scheduler_task_count = 0;
+static int scheduler_current_task  = -1;
+static int scheduler_task_count    = 0;
 
 
 extern "C" __attribute__ ((naked)) void scheduler_context_switch (
@@ -31,7 +31,7 @@ extern "C" __attribute__ ((naked)) void scheduler_context_switch (
     );
 }
 
-static scheduler_task_t* scheduler_current_task_ptr() {
+static scheduler_task_t *scheduler_current_task_ptr() {
     if (scheduler_current_task < 0 || scheduler_current_task >= scheduler_max_tasks)
         return 0;
     else return &scheduler_tasks[scheduler_current_task];
@@ -67,14 +67,14 @@ void scheduler_init() {
         scheduler_tasks[index].context.r14 = 0;
         scheduler_tasks[index].context.r15 = 0;
         scheduler_tasks[index].context.rsp = 0;
-        scheduler_tasks[index].entry       = 0;
-        scheduler_tasks[index].arg         = 0;
-        scheduler_tasks[index].active = 0;
+        scheduler_tasks[index].entry    = 0;
+        scheduler_tasks[index].arg      = 0;
+        scheduler_tasks[index].active   = 0;
         scheduler_tasks[index].finished = 0;
     }
 }
 
-int scheduler_create_task(scheduler_task_fn entry, void* arg) {
+int scheduler_create_task(scheduler_task_fn entry, void *arg) {
     if (entry == 0) return -1;
 
     int index = -1;
@@ -88,9 +88,9 @@ int scheduler_create_task(scheduler_task_fn entry, void* arg) {
     if (index == -1) return -1;
 
     scheduler_task_t &task = scheduler_tasks[index];
-    task.entry = entry;
-    task.arg = arg;
-    task.active = true;
+    task.entry    = entry;
+    task.arg      = arg;
+    task.active   = true;
     task.finished = false;
 
     task.context.rbx = 0;

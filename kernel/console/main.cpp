@@ -35,9 +35,9 @@ static void prepare_cursor() {
     }
 }
 
-void write_console(const char* str, ui32 color) {
+void write_console(const char *str, ui32 color) {
     if (str == 0) return;
-    for (const char* cursor = str; *cursor != 0; cursor++) {
+    for (const char *cursor = str; *cursor != 0; cursor++) {
         if (*cursor == '\n') {
             current_char = 0;
             current_line++;
