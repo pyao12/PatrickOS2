@@ -1,0 +1,8 @@
+AlignConsecutiveAssignments:
+  Enabled: true
+AlignConsecutiveDeclarations:
+  Enabled: true
+BasedOnStyle: LLVM
+BreakBeforeBraces: Attach
+PointerAlignment: Right
+IndentWidth: 4

@@ -1,7 +1,7 @@
 #pragma once
 
-#include <common.h>
 #include "colors.h"
+#include <common.h>
 
 // 类型定义
 typedef struct mb_info {
@@ -12,7 +12,7 @@ typedef struct mb_info {
     ui32 cmdline;
     ui32 mods_count;
     ui32 mods_addr;
-    ui8 syms[16];
+    ui8  syms[16];
     ui32 mmap_length;
     ui32 mmap_addr;
     ui32 drives_length;
@@ -30,19 +30,19 @@ typedef struct mb_info {
     ui32 framebuffer_pitch;
     ui32 framebuffer_width;
     ui32 framebuffer_height;
-    ui8 framebuffer_bpp;
-    ui8 framebuffer_type;
-    ui8 color_info[6];
-} __attribute__ ((packed)) mb_info_t;
+    ui8  framebuffer_bpp;
+    ui8  framebuffer_type;
+    ui8  color_info[6];
+} __attribute__((packed)) mb_info_t;
 
 typedef struct graphics_state {
     volatile ui8 *framebuffer;
-    ui32 width;
-    ui32 height;
-    ui32 pitch;
-    ui8 bytes_per_pixel;
-    ui8 bits_per_pixel;
-    bool initialized;
+    ui32          width;
+    ui32          height;
+    ui32          pitch;
+    ui8           bytes_per_pixel;
+    ui8           bits_per_pixel;
+    bool          initialized;
 } graphics_state_t;
 
 // 函数声明

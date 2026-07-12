@@ -7,7 +7,7 @@ _FLAGS_COMMON := -m64 -fno-pic -fno-pie -nostdlib
 FLAGS_CPP     := $(_FLAGS_COMMON) -ffreestanding -fno-exceptions -mno-red-zone -fcf-protection=none -Wall -Wextra -MMD -MP -I./include/
 FLAGS_AS      := $(_FLAGS_COMMON)
 FLAGS_LD      := -m elf_x86_64 -T linker.ld
-QEMUFLAGS     ?= -monitor stdio --no-reboot -m 2048 
+QEMUFLAGS     ?= -serial file:serial.log --no-reboot -m 2048 
 
 BUILD_DIR        := build
 PARTITION_OFFSET := 2048
@@ -16,6 +16,7 @@ GRUB_PC_DIR      := /usr/lib/grub/i386-pc
 
 CPP_SOURCES        := $(shell find kernel -name '*.cpp')
 ASM_SOURCES        := $(shell find -name '*.s')
+HEADER_SOURCES     := $(shell find -name '*.h')
 OBJECTS            := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(CPP_SOURCES)) $(patsubst %.s,$(BUILD_DIR)/%.o,$(ASM_SOURCES))
 DEPS               := $(OBJECTS:.o=.d)
 PROGRAMS_DIR       := programs
@@ -72,6 +73,10 @@ clean:
 	@echo "Cleaning old files..."
 	@$(MAKE) -C $(PROGRAMS_DIR) clean
 	@rm -rf $(BUILD_DIR)
+
+style:
+	@echo "Formatting all files..."
+	@clang-format -i $(CPP_SOURCES) $(HEADER_SOURCES)
 
 .PHONY: all programs run clean
 

@@ -1,27 +1,23 @@
-# Repository Guidelines
+# Repository Guide
 
-## Project Structure & Module Organization
+## Build And Verification
 
-This is a 64-bit x86 educational operating-system kernel. `boot/boot.s` contains the Multiboot entry point, early paging, and the transition to long mode. Kernel implementations live in `kernel/`, with the framebuffer code in `kernel/graphics/` and console code in `kernel/console/`. Public interfaces and shared types belong in `include/`, mirroring implementation areas where practical (for example, `include/graphics/`). `grub.cfg` and `linker.ld` define boot and link behavior. Generated objects, the ELF, and disk image are written to `build/`; never edit or commit that directory.
+- This is a freestanding x86_64 OS: both kernel and programs use Clang/LLD with `-nostdlib`; do not assume a hosted C++ runtime or standard library.
+- The image build also requires `sfdisk`, `mkfs.fat`, `grub-mkimage`, and `mcopy` (`mtools`).
+- After every change, run `make clean` and then `make`; the root build compiles the kernel, every `programs/*.cpp`, and `build/pos2.img`.
+- There is no automated test, lint, or formatter target. Do not use `make run`: its graphical QEMU launch fails in the agent environment.
+- For runtime checks, launch headless QEMU with a timeout: `timeout 10s qemu-system-x86_64 -drive format=raw,file=build/pos2.img -serial file:serial.log --no-reboot -m 2048 --display none`. A timeout exit is expected; inspect only the first 30 lines of `serial.log`, never the whole file.
+- For temporary boot tracing, use `serial_write_char()`/the serial helpers and remove diagnostic markers after debugging.
 
-## Build, Test, and Development Commands
+## Architecture
 
-- `make`: compiles all `*.cpp` and `*.s` sources, links `build/kernel.elf`, and creates `build/pos2.img`.
-- `make run`: builds as needed, then boots the raw image with `qemu-system-x86_64`.
-- `make clean`: removes all generated build output before a clean rebuild.
+- `boot/boot.s` enters long mode and calls `kernel_main()` in `kernel/main.cpp`; initialization then mounts FAT32, starts console/input tasks, and runs the scheduler.
+- Kernel headers live in `include/`; user programs are separate PIE ELF files built from top-level `programs/*.cpp` and copied into `/programs` in the FAT32 image.
+- The program ABI is duplicated in `include/program.h` and `programs/include/program.h`. Keep their shared types in lockstep, and update the API mapping/syscall stubs in `kernel/program.cpp` when adding an operation.
+- Source discovery is automatic: all `kernel/**/*.cpp` and every repository `*.s` feed the kernel build, while only top-level `programs/*.cpp` become user executables.
 
-The build requires `clang`, `clang++`, `ld.lld`, GRUB image tools, FAT image tools (`mkfs.fat`, `mcopy`), `sfdisk`, and QEMU. There is currently no automated test suite; validate behavior by rebuilding and booting the image after kernel or boot changes.
+## C++ Style
 
-## Coding Style & Naming Conventions
-
-Use four-space indentation and braces on the same line as control statements and function declarations, matching existing C++ sources. Prefer the project's fixed-width aliases from `include/common.h` (`ui8`, `ui32`, `ui64`, `uip`) for kernel-facing data. Use `snake_case` for functions, variables, filenames, and C-style types; use descriptive module names such as `scheduler_context_t`. Keep headers self-contained, declarations in `include/`, and implementation in the corresponding `kernel/` area.
-
-This is freestanding code: do not introduce standard-library, runtime, dynamic-allocation, exceptions, or host OS dependencies without updating the build and boot design. Preserve required ABI details in assembly and naked context-switch routines.
-
-## Testing Guidelines
-
-For each change, run `make` and `make run`. Exercise the affected boot or kernel path in QEMU and check for successful startup, expected framebuffer output, and scheduler behavior where relevant. Add a small focused kernel test or diagnostic task when changing low-level algorithms; remove temporary diagnostics before submitting.
-
-## Commit & Pull Request Guidelines
-
-Recent commits use Conventional Commit-style prefixes, commonly `feat:` and `chore:`; write concise imperative summaries, for example `feat: add round-robin task cleanup`. Keep commits scoped to one logical change. Pull requests should describe the boot-visible behavior, link related issues when applicable, and include QEMU screenshots or serial output for graphics, console, scheduler, or boot-flow changes. Note required tooling or configuration changes explicitly.
+- Keep opening braces on the declaration/control line.
+- Attach `*` to the variable or function declarator, for example `char *text` and `void *allocate()`.
+- Align types, names, and `=` across consecutive similar declarations or assignments, matching surrounding code.

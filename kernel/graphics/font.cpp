@@ -1,5 +1,5 @@
-#include <graphics/font.h>
 #include <graphics/basic.h>
+#include <graphics/font.h>
 
 void print_char(char c, ui32 posx, ui32 posy, ui32 color) {
     int index_begin = c * 16 + 1;

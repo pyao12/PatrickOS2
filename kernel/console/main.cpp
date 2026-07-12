@@ -1,11 +1,11 @@
-#include <graphics/font.h>
-#include <graphics/basic.h>
-#include <memory.h>
-#include <scheduler.h>
-#include <fs/fat32.h>
-#include <input.h>
 #include <algo/convert.h>
+#include <fs/fat32.h>
+#include <graphics/basic.h>
+#include <graphics/font.h>
+#include <input.h>
+#include <memory.h>
 #include <program.h>
+#include <scheduler.h>
 
 constexpr int max_line      = 48;
 constexpr int line_max_char = 160;
@@ -36,7 +36,8 @@ static void prepare_cursor() {
 }
 
 void write_console(const char *str, ui32 color) {
-    if (str == 0) return;
+    if (str == 0)
+        return;
     for (const char *cursor = str; *cursor != 0; cursor++) {
         if (*cursor == '\n') {
             current_char = 0;
@@ -62,13 +63,15 @@ static void write_prompt() {
 
 static ui32 str_len(const char *s) {
     ui32 len = 0;
-    while (s[len]) len++;
+    while (s[len])
+        len++;
     return len;
 }
 
 static bool str_eq(const char *a, const char *b) {
     while (*a && *b) {
-        if (*a != *b) return false;
+        if (*a != *b)
+            return false;
         a++;
         b++;
     }
@@ -102,7 +105,8 @@ static void resolve_path(const char *in, char *out, ui32 max) {
     ui32 count = 0;
 
     const char *p = in;
-    if (*p == '/') p++;
+    if (*p == '/')
+        p++;
 
     while (*p && count < 16) {
         ui32 len = 0;
@@ -113,21 +117,26 @@ static void resolve_path(const char *in, char *out, ui32 max) {
         if (len > 0) {
             if (str_eq(segs[count], ".")) {
             } else if (str_eq(segs[count], "..")) {
-                if (count > 0) count--;
+                if (count > 0)
+                    count--;
             } else {
                 count++;
             }
         }
-        if (*p == '/') p++;
+        if (*p == '/')
+            p++;
     }
 
-    out[0] = '/';
+    out[0]   = '/';
     ui32 pos = 1;
     for (ui32 i = 0; i < count; i++) {
         ui32 slen = str_len(segs[i]);
-        if (pos + slen + 2 > max) break;
-        for (ui32 j = 0; j < slen; j++) out[pos++] = segs[i][j];
-        if (i + 1 < count) out[pos++] = '/';
+        if (pos + slen + 2 > max)
+            break;
+        for (ui32 j = 0; j < slen; j++)
+            out[pos++] = segs[i][j];
+        if (i + 1 < count)
+            out[pos++] = '/';
     }
     out[pos] = 0;
 }
@@ -170,7 +179,7 @@ static void cmd_cd(const char *arg) {
     str_copy(cwd, path, max_path_len);
     ui32 cwd_len = str_len(cwd);
     if (cwd_len > 1 && cwd[cwd_len - 1] != '/') {
-        cwd[cwd_len] = '/';
+        cwd[cwd_len]     = '/';
         cwd[cwd_len + 1] = 0;
     }
 }
@@ -191,11 +200,13 @@ static void cmd_cat(const char *arg) {
     char path[max_path_len];
     resolve_path(raw, path, max_path_len);
 
-    if (!program_run("/programs/cat.elf", path, cwd)) write_console("cat: cannot load program\n", COLOR_RED);
+    if (!program_run("/programs/cat.elf", path, cwd))
+        write_console("cat: cannot load program\n", COLOR_RED);
 }
 
 static void cmd_ls() {
-    if (!program_run("/programs/ls.elf", cwd, cwd)) write_console("ls: cannot load program\n", COLOR_RED);
+    if (!program_run("/programs/ls.elf", cwd, cwd))
+        write_console("ls: cannot load program\n", COLOR_RED);
 }
 
 static void cmd_clear() {
@@ -211,12 +222,15 @@ static void cmd_run(const char *arg) {
     }
 
     char raw[max_path_len];
-    if (arg[0] == '/') str_copy(raw, arg, max_path_len);
-    else str_concat(raw, cwd, arg, max_path_len);
+    if (arg[0] == '/')
+        str_copy(raw, arg, max_path_len);
+    else
+        str_concat(raw, cwd, arg, max_path_len);
 
     char path[max_path_len];
     resolve_path(raw, path, max_path_len);
-    if (!program_run(path, "", cwd)) write_console("run: cannot load program\n", COLOR_RED);
+    if (!program_run(path, "", cwd))
+        write_console("run: cannot load program\n", COLOR_RED);
 }
 
 static bool run_program_command(const char *cmd, const char *arg) {
@@ -231,13 +245,16 @@ static bool run_program_command(const char *cmd, const char *arg) {
     path[pos++] = 'e';
     path[pos++] = 'l';
     path[pos++] = 'f';
-    path[pos] = 0;
+    path[pos]   = 0;
 
     fat32_file_t file;
-    if (!fat32_open(path, &file)) return false;
+    if (!fat32_open(path, &file))
+        return false;
     char raw[max_path_len];
-    if (arg[0] == '/') str_copy(raw, arg, max_path_len);
-    else str_concat(raw, cwd, arg, max_path_len);
+    if (arg[0] == '/')
+        str_copy(raw, arg, max_path_len);
+    else
+        str_concat(raw, cwd, arg, max_path_len);
 
     char resolved[max_path_len];
     resolve_path(raw, resolved, max_path_len);
@@ -245,20 +262,24 @@ static bool run_program_command(const char *cmd, const char *arg) {
 }
 
 static void parse_and_exec(char *cmd) {
-    while (*cmd == ' ') cmd++;
+    while (*cmd == ' ')
+        cmd++;
     ui32 len = str_len(cmd);
     while (len > 0 && cmd[len - 1] == ' ') {
         cmd[--len] = 0;
     }
 
-    if (len == 0) return;
+    if (len == 0)
+        return;
 
     char *arg = cmd;
-    while (*arg && *arg != ' ') arg++;
+    while (*arg && *arg != ' ')
+        arg++;
     if (*arg == ' ') {
         *arg = 0;
         arg++;
-        while (*arg == ' ') arg++;
+        while (*arg == ' ')
+            arg++;
     } else {
         arg = cmd + len;
     }
@@ -283,13 +304,13 @@ static void parse_and_exec(char *cmd) {
 }
 
 void console_main(void *arg) {
-    (void) arg;
+    (void)arg;
     clear_screen();
     write_console("PatrickOS 2 Shell\n", COLOR_GREEN);
     write_console("Type 'help' for available commands.\n\n", COLOR_GRAY);
 
     char line_buf[max_cmd_len];
-    int line_pos = 0;
+    int  line_pos = 0;
 
     write_prompt();
 
@@ -311,11 +332,12 @@ void console_main(void *arg) {
                 line_pos--;
                 current_char--;
                 prepare_cursor();
-                print_char(' ', current_char * 8, current_line * 16, COLOR_WHITE);
+                print_char(' ', current_char * 8, current_line * 16,
+                           COLOR_WHITE);
             }
         } else if (c >= ' ' && c < 127 && line_pos < max_cmd_len - 1) {
             line_buf[line_pos++] = c;
-            char buf[2] = { c, 0 };
+            char buf[2]          = {c, 0};
             write_console(buf, COLOR_WHITE);
         }
 
