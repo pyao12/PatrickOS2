@@ -1,4 +1,5 @@
 #include <console.h>
+#include <devices/serial.h>
 #include <fs/fat32.h>
 #include <graphics/layer.h>
 #include <input.h>
@@ -394,11 +395,19 @@ extern "C" ui64 program_syscall(ui64 number, ui64 argument1, ui64 argument2,
 
     if (number == syscall_read_file) {
         if (argument2 > 0xffffffffu || argument4 > max_syscall_io ||
-            !user_range_mapped(active_program, argument3, argument4))
+            !user_range_mapped(active_program, argument3, argument4)) {
+            serial_write_str("read_file invalid buffer: ");
+            serial_write_str(path);
+            serial_write_str("\n");
             return syscall_result_failure;
+        }
         fat32_file_t file;
-        if (!fat32_open(path, &file))
+        if (!fat32_open(path, &file)) {
+            serial_write_str("read_file open failed: ");
+            serial_write_str(path);
+            serial_write_str("\n");
             return (ui64)-1;
+        }
         return (ui64)fat32_read(&file, (ui32)argument2, (ui8 *)(uip)argument3,
                                 (ui32)argument4);
     }
@@ -430,11 +439,18 @@ extern "C" ui64 program_syscall(ui64 number, ui64 argument1, ui64 argument2,
     if (argument3 > 64 ||
         !user_range_mapped(active_program, argument2,
                            argument3 * sizeof(program_directory_entry_t))) {
+        serial_write_str("list_directory invalid buffer: ");
+        serial_write_str(path);
+        serial_write_str("\n");
         return syscall_result_failure;
     }
     fat32_directory_entry_t *entries = fat32_list_directory(path);
-    if (entries == 0 && !fat32_directory_exists(path))
+    if (entries == 0 && !fat32_directory_exists(path)) {
+        serial_write_str("list_directory missing: ");
+        serial_write_str(path);
+        serial_write_str("\n");
         return (ui64)-1;
+    }
     ui64                       count = 0;
     program_directory_entry_t *user_entries =
         (program_directory_entry_t *)(uip)argument2;
@@ -625,9 +641,9 @@ bool program_run(const char *path, const char *argument, const char *cwd) {
     constexpr ui64 layer_fill_stub_offset         = 832;
     constexpr ui64 layer_draw_pixel_stub_offset   = 848;
     constexpr ui64 layer_fill_rect_stub_offset    = 864;
-    constexpr ui64 argument_offset                = 128;
-    constexpr ui64 cwd_offset                     = 384;
-    program_api_t *api = (program_api_t *)program.api;
+    constexpr ui64 argument_offset                = 1024;
+    constexpr ui64 cwd_offset = argument_offset + max_syscall_path;
+    program_api_t *api        = (program_api_t *)program.api;
     api->write_console = (void (*)(const char *, ui32))(uip)(user_api_address +
                                                              write_stub_offset);
     api->yield     = (void (*)())(uip)(user_api_address + yield_stub_offset);
@@ -754,14 +770,13 @@ bool program_run(const char *path, const char *argument, const char *cwd) {
             layer_fill_rect_stub[index];
     for (ui64 index = 0; index < sizeof(exit_stub); index++)
         program.api[exit_stub_offset + index] = exit_stub[index];
-    for (ui64 index = 0; argument != 0 && argument[index] != 0 &&
-                         index + 1 < page_size - argument_offset;
+    for (ui64 index = 0;
+         argument != 0 && argument[index] != 0 && index + 1 < max_syscall_path;
          index++) {
         program.api[argument_offset + index] = argument[index];
     }
     for (ui64 index = 0;
-         cwd != 0 && cwd[index] != 0 && index + 1 < page_size - cwd_offset;
-         index++) {
+         cwd != 0 && cwd[index] != 0 && index + 1 < max_syscall_path; index++) {
         program.api[cwd_offset + index] = cwd[index];
     }
 
