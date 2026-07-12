@@ -40,8 +40,7 @@ extern "C" void             *x86_exception_stubs[32];
 extern "C" void              keyboard_interrupt_stub();
 extern "C" void              ps2mouse_interrupt_stub();
 extern "C" void              x86_syscall_stub(); // 在 user.s 中定义
-extern "C" void              x86_load_tables(const table_descriptor_t *,
-                                             const table_descriptor_t *, ui16);
+extern "C" void              x86_load_tables(const table_descriptor_t *, const table_descriptor_t *, ui16);
 extern "C" bool              x86_enter_user_asm(ui64, ui64, ui64, ui64);
 extern "C" [[noreturn]] void x86_leave_user_asm(bool); // user.s
 
@@ -70,27 +69,22 @@ void x86_init() {
 
     ui64 tss_address = (ui64)(uip)&x86_tss;
     ui64 tss_limit   = sizeof(x86_tss) - 1;
-    gdt[5]           = (tss_limit & 0xffff) | ((tss_address & 0xffffff) << 16) |
-             (0x89ULL << 40) | (((tss_limit >> 16) & 0xf) << 48) |
+    gdt[5] = (tss_limit & 0xffff) | ((tss_address & 0xffffff) << 16) | (0x89ULL << 40) | (((tss_limit >> 16) & 0xf) << 48) |
              (((tss_address >> 24) & 0xff) << 56);
     gdt[6] = tss_address >> 32;
 
-    x86_tss.ist[0] =
-        (ui64)(uip)(double_fault_stack + sizeof(double_fault_stack));
+    x86_tss.ist[0]           = (ui64)(uip)(double_fault_stack + sizeof(double_fault_stack));
     x86_tss.io_bitmap_offset = sizeof(x86_tss);
 
     for (ui8 vector = 0; vector < 32; vector++) {
-        set_idt_entry(vector, x86_exception_stubs[vector], interrupt_gate,
-                      vector == 8 ? 1 : 0);
+        set_idt_entry(vector, x86_exception_stubs[vector], interrupt_gate, vector == 8 ? 1 : 0);
     }
     set_idt_entry(0x80, (void *)x86_syscall_stub, user_interrupt_gate);
     set_idt_entry(0x21, (void *)keyboard_interrupt_stub, interrupt_gate);
     set_idt_entry(0x2c, (void *)ps2mouse_interrupt_stub, interrupt_gate);
 
-    table_descriptor_t gdt_descriptor = {(ui16)(sizeof(gdt) - 1),
-                                         (ui64)(uip)gdt};
-    table_descriptor_t idt_descriptor = {(ui16)(sizeof(idt) - 1),
-                                         (ui64)(uip)idt};
+    table_descriptor_t gdt_descriptor = {(ui16)(sizeof(gdt) - 1), (ui64)(uip)gdt};
+    table_descriptor_t idt_descriptor = {(ui16)(sizeof(idt) - 1), (ui64)(uip)idt};
     x86_load_tables(&gdt_descriptor, &idt_descriptor, tss_selector);
 
     ui32 low;
@@ -98,15 +92,10 @@ void x86_init() {
     asm("rdmsr" : "=a"(low), "=d"(high) : "c"(0xc0000080));
     low |= 1u << 11;
     asm("wrmsr" : : "a"(low), "d"(high), "c"(0xc0000080));
-    asm("mov %%cr0, %%rax; or $0x10000, %%rax; mov %%rax, %%cr0"
-        :
-        :
-        : "rax", "memory");
+    asm("mov %%cr0, %%rax; or $0x10000, %%rax; mov %%rax, %%cr0" : : : "rax", "memory");
 }
 
-void x86_set_interrupt_handler(ui8 vector, void *handler) {
-    set_idt_entry(vector, handler, interrupt_gate);
-}
+void x86_set_interrupt_handler(ui8 vector, void *handler) { set_idt_entry(vector, handler, interrupt_gate); }
 
 bool x86_enter_user(ui64 entry, ui64 stack, ui64 argument, ui64 page_table) {
     return x86_enter_user_asm(entry, stack, argument, page_table);

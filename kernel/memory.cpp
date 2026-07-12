@@ -28,21 +28,14 @@ static bool memory_ready      = false;
 extern "C" ui8 kernel_start;
 extern "C" ui8 kernel_end;
 
-static void mark_page_used(ui64 page) {
-    page_bitmap[page / 8] |= (ui8)(1u << (page % 8));
-}
+static void mark_page_used(ui64 page) { page_bitmap[page / 8] |= (ui8)(1u << (page % 8)); }
 
-static void mark_page_free(ui64 page) {
-    page_bitmap[page / 8] &= (ui8) ~(1u << (page % 8));
-}
+static void mark_page_free(ui64 page) { page_bitmap[page / 8] &= (ui8) ~(1u << (page % 8)); }
 
-static bool page_is_used(ui64 page) {
-    return (page_bitmap[page / 8] & (ui8)(1u << (page % 8))) != 0;
-}
+static bool page_is_used(ui64 page) { return (page_bitmap[page / 8] & (ui8)(1u << (page % 8))) != 0; }
 
 static ui64 range_end(ui64 start, ui64 length) {
-    if (start > physical_memory_limit ||
-        length > physical_memory_limit - start) {
+    if (start > physical_memory_limit || length > physical_memory_limit - start) {
         halt();
     }
     return start + length;
@@ -83,8 +76,7 @@ static void reserve_range(ui64 start, ui64 length) {
 
 static void reserve_boot_data(const mb_info_t *mb_info) {
     reserve_range(0, 0x100000);
-    reserve_range((ui64)(uip)&kernel_start,
-                  (ui64)(uip)&kernel_end - (ui64)(uip)&kernel_start);
+    reserve_range((ui64)(uip)&kernel_start, (ui64)(uip)&kernel_end - (ui64)(uip)&kernel_start);
     reserve_range((ui64)(uip)page_bitmap, (page_count + 7) / 8);
     reserve_range((ui64)(uip)mb_info, sizeof(mb_info_t));
 
@@ -97,27 +89,20 @@ static void reserve_boot_data(const mb_info_t *mb_info) {
         reserve_range(mb_info->boot_loader_name, 1);
 
     if ((mb_info->flags & (1u << 3)) != 0) {
-        reserve_range(mb_info->mods_addr,
-                      (ui64)mb_info->mods_count * sizeof(mb_module_t));
-        const mb_module_t *modules =
-            (const mb_module_t *)(uip)mb_info->mods_addr;
+        reserve_range(mb_info->mods_addr, (ui64)mb_info->mods_count * sizeof(mb_module_t));
+        const mb_module_t *modules = (const mb_module_t *)(uip)mb_info->mods_addr;
         for (ui32 index = 0; index < mb_info->mods_count; index++) {
-            reserve_range(modules[index].mod_start,
-                          (ui64)modules[index].mod_end -
-                              modules[index].mod_start);
+            reserve_range(modules[index].mod_start, (ui64)modules[index].mod_end - modules[index].mod_start);
             reserve_range(modules[index].string, 1);
         }
     }
 
     if ((mb_info->flags & (1u << 12)) != 0) {
-        reserve_range(mb_info->framebuffer_addr,
-                      (ui64)mb_info->framebuffer_pitch *
-                          mb_info->framebuffer_height);
+        reserve_range(mb_info->framebuffer_addr, (ui64)mb_info->framebuffer_pitch * mb_info->framebuffer_height);
     }
 }
 
-static bool ranges_overlap(ui64 first_start, ui64 first_length,
-                           ui64 second_start, ui64 second_length) {
+static bool ranges_overlap(ui64 first_start, ui64 first_length, ui64 second_start, ui64 second_length) {
     if (first_length == 0 || second_length == 0)
         return false;
 
@@ -126,41 +111,31 @@ static bool ranges_overlap(ui64 first_start, ui64 first_length,
     return first_start < second_end && second_start < first_end;
 }
 
-static bool overlaps_boot_data(const mb_info_t *mb_info, ui64 start,
-                               ui64 length) {
+static bool overlaps_boot_data(const mb_info_t *mb_info, ui64 start, ui64 length) {
     if (ranges_overlap(start, length, 0, 0x100000) ||
-        ranges_overlap(start, length, (ui64)(uip)&kernel_start,
-                       (ui64)(uip)&kernel_end - (ui64)(uip)&kernel_start) ||
+        ranges_overlap(start, length, (ui64)(uip)&kernel_start, (ui64)(uip)&kernel_end - (ui64)(uip)&kernel_start) ||
         ranges_overlap(start, length, (ui64)(uip)mb_info, sizeof(mb_info_t)) ||
-        ranges_overlap(start, length, mb_info->mmap_addr,
-                       mb_info->mmap_length)) {
+        ranges_overlap(start, length, mb_info->mmap_addr, mb_info->mmap_length)) {
         return true;
     }
 
-    if ((mb_info->flags & (1u << 2)) != 0 &&
-        ranges_overlap(start, length, mb_info->cmdline, 1))
+    if ((mb_info->flags & (1u << 2)) != 0 && ranges_overlap(start, length, mb_info->cmdline, 1))
         return true;
-    if ((mb_info->flags & (1u << 9)) != 0 &&
-        ranges_overlap(start, length, mb_info->boot_loader_name, 1))
+    if ((mb_info->flags & (1u << 9)) != 0 && ranges_overlap(start, length, mb_info->boot_loader_name, 1))
         return true;
-    if ((mb_info->flags & (1u << 12)) != 0 &&
-        ranges_overlap(start, length, mb_info->framebuffer_addr,
-                       (ui64)mb_info->framebuffer_pitch *
-                           mb_info->framebuffer_height))
+    if ((mb_info->flags & (1u << 12)) != 0 && ranges_overlap(start, length, mb_info->framebuffer_addr,
+                                                             (ui64)mb_info->framebuffer_pitch * mb_info->framebuffer_height))
         return true;
 
     if ((mb_info->flags & (1u << 3)) == 0)
         return false;
 
-    if (ranges_overlap(start, length, mb_info->mods_addr,
-                       (ui64)mb_info->mods_count * sizeof(mb_module_t)))
+    if (ranges_overlap(start, length, mb_info->mods_addr, (ui64)mb_info->mods_count * sizeof(mb_module_t)))
         return true;
 
     const mb_module_t *modules = (const mb_module_t *)(uip)mb_info->mods_addr;
     for (ui32 index = 0; index < mb_info->mods_count; index++) {
-        if (ranges_overlap(start, length, modules[index].mod_start,
-                           (ui64)modules[index].mod_end -
-                               modules[index].mod_start) ||
+        if (ranges_overlap(start, length, modules[index].mod_start, (ui64)modules[index].mod_end - modules[index].mod_start) ||
             ranges_overlap(start, length, modules[index].string, 1)) {
             return true;
         }
@@ -174,14 +149,13 @@ static ui8 *find_bitmap_storage(const mb_info_t *mb_info, ui64 bitmap_size) {
     ui64       storage_length = (bitmap_size + page_mask) & ~page_mask;
 
     while (cursor < end) {
-        const mb_mmap_entry_t *entry = (const mb_mmap_entry_t *)cursor;
-        ui64 record_length           = (ui64)entry->size + sizeof(entry->size);
-        ui64 available_end           = range_end(entry->addr, entry->length);
+        const mb_mmap_entry_t *entry         = (const mb_mmap_entry_t *)cursor;
+        ui64                   record_length = (ui64)entry->size + sizeof(entry->size);
+        ui64                   available_end = range_end(entry->addr, entry->length);
         if (entry->type == 1) {
             ui64 candidate = (entry->addr + page_mask) & ~page_mask;
             available_end &= ~page_mask;
-            while (candidate < available_end &&
-                   storage_length <= available_end - candidate) {
+            while (candidate < available_end && storage_length <= available_end - candidate) {
                 if (!overlaps_boot_data(mb_info, candidate, storage_length)) {
                     return (ui8 *)(uip)candidate;
                 }
@@ -209,8 +183,7 @@ void *memory_alloc_pages(ui64 count) {
             continue;
 
         ui64 first = page + 1 - count;
-        for (ui64 allocated_page = first; allocated_page <= page;
-             allocated_page++) {
+        for (ui64 allocated_page = first; allocated_page <= page; allocated_page++) {
             mark_page_used(allocated_page);
         }
         free_page_count -= count;
@@ -221,8 +194,7 @@ void *memory_alloc_pages(ui64 count) {
 
 void memory_free_pages(void *address, ui64 count) {
     ui64 start = (ui64)(uip)address;
-    if (!memory_ready || address == 0 || count == 0 ||
-        (start & page_mask) != 0 || start >= physical_memory_limit ||
+    if (!memory_ready || address == 0 || count == 0 || (start & page_mask) != 0 || start >= physical_memory_limit ||
         count > (physical_memory_limit - start) / page_size) {
         halt();
     }
@@ -240,8 +212,7 @@ static void *kmalloc(uip size) {
 
     uip                  total_size = size + sizeof(allocation_header_t);
     ui64                 pages      = (total_size + page_mask) / page_size;
-    allocation_header_t *header =
-        (allocation_header_t *)memory_alloc_pages(pages);
+    allocation_header_t *header     = (allocation_header_t *)memory_alloc_pages(pages);
     if (header == 0)
         return 0;
 
@@ -264,8 +235,8 @@ static void kfree(void *address) {
 }
 
 void memory_init(const mb_info_t *mb_info) {
-    if (memory_ready || mb_info == 0 || (mb_info->flags & (1u << 6)) == 0 ||
-        mb_info->mmap_addr == 0 || mb_info->mmap_length == 0) {
+    if (memory_ready || mb_info == 0 || (mb_info->flags & (1u << 6)) == 0 || mb_info->mmap_addr == 0 ||
+        mb_info->mmap_length == 0) {
         halt();
     }
 
@@ -276,10 +247,9 @@ void memory_init(const mb_info_t *mb_info) {
         if ((ui64)(end - cursor) < sizeof(mb_mmap_entry_t))
             halt();
 
-        const mb_mmap_entry_t *entry = (const mb_mmap_entry_t *)cursor;
-        ui64 record_length           = (ui64)entry->size + sizeof(entry->size);
-        if (record_length < sizeof(mb_mmap_entry_t) ||
-            record_length > (ui64)(end - cursor))
+        const mb_mmap_entry_t *entry         = (const mb_mmap_entry_t *)cursor;
+        ui64                   record_length = (ui64)entry->size + sizeof(entry->size);
+        if (record_length < sizeof(mb_mmap_entry_t) || record_length > (ui64)(end - cursor))
             halt();
 
         ui64 entry_end = range_end(entry->addr, entry->length);
@@ -307,10 +277,9 @@ void memory_init(const mb_info_t *mb_info) {
         if ((ui64)(end - cursor) < sizeof(mb_mmap_entry_t))
             halt();
 
-        const mb_mmap_entry_t *entry = (const mb_mmap_entry_t *)cursor;
-        ui64 record_length           = (ui64)entry->size + sizeof(entry->size);
-        if (record_length < sizeof(mb_mmap_entry_t) ||
-            record_length > (ui64)(end - cursor))
+        const mb_mmap_entry_t *entry         = (const mb_mmap_entry_t *)cursor;
+        ui64                   record_length = (ui64)entry->size + sizeof(entry->size);
+        if (record_length < sizeof(mb_mmap_entry_t) || record_length > (ui64)(end - cursor))
             halt();
 
         if (entry->type == 1)

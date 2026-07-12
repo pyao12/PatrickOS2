@@ -10,13 +10,10 @@ constexpr ui32 pit_input_frequency  = 1193182;
 
 extern "C" void scheduler_timer_interrupt_stub();
 
-void scheduler_outb(ui16 port, ui8 value) {
-    asm("outb %0, %1" : : "a"(value), "Nd"(port));
-}
+void scheduler_outb(ui16 port, ui8 value) { asm("outb %0, %1" : : "a"(value), "Nd"(port)); }
 
 void scheduler_timer_init() {
-    x86_set_interrupt_handler(pit_interrupt_vector,
-                              (void *)scheduler_timer_interrupt_stub);
+    x86_set_interrupt_handler(pit_interrupt_vector, (void *)scheduler_timer_interrupt_stub);
 
     scheduler_outb(0x20, 0x11);
     scheduler_outb(0xa0, 0x11);
@@ -37,15 +34,13 @@ void scheduler_timer_init() {
 
 } // namespace
 
-alignas(16) static ui8
-    scheduler_task_stacks[scheduler_max_tasks][scheduler_stack_size];
+alignas(16) static ui8 scheduler_task_stacks[scheduler_max_tasks][scheduler_stack_size];
 static scheduler_task_t    scheduler_tasks[scheduler_max_tasks];
 static scheduler_context_t scheduler_context;
 static int                 scheduler_current_task = -1;
 static int                 scheduler_task_count   = 0;
 
-extern "C" __attribute__((naked)) void
-scheduler_context_switch(scheduler_context_t *from, scheduler_context_t *to) {
+extern "C" __attribute__((naked)) void scheduler_context_switch(scheduler_context_t *from, scheduler_context_t *to) {
     asm("movq %rbx, 0(%rdi)\n"
         "movq %rbp, 8(%rdi)\n"
         "movq %r12, 16(%rdi)\n"
@@ -64,8 +59,7 @@ scheduler_context_switch(scheduler_context_t *from, scheduler_context_t *to) {
 }
 
 static scheduler_task_t *scheduler_current_task_ptr() {
-    if (scheduler_current_task < 0 ||
-        scheduler_current_task >= scheduler_max_tasks)
+    if (scheduler_current_task < 0 || scheduler_current_task >= scheduler_max_tasks)
         return 0;
     else
         return &scheduler_tasks[scheduler_current_task];
@@ -147,8 +141,7 @@ int scheduler_create_task(scheduler_task_fn entry, void *arg) {
     task.context.r14 = 0;
     task.context.r15 = 0;
 
-    uip *stack_top   = reinterpret_cast<uip *>(scheduler_task_stacks[index] +
-                                               scheduler_stack_size);
+    uip *stack_top   = reinterpret_cast<uip *>(scheduler_task_stacks[index] + scheduler_stack_size);
     *--stack_top     = 0;
     *--stack_top     = reinterpret_cast<uip>(&scheduler_task_trampoline);
     task.context.rsp = reinterpret_cast<ui64>(stack_top);
@@ -165,8 +158,7 @@ void scheduler_run() {
         if (next_task < 0)
             return;
         scheduler_current_task = next_task;
-        scheduler_context_switch(&scheduler_context,
-                                 &scheduler_tasks[next_task].context);
+        scheduler_context_switch(&scheduler_context, &scheduler_tasks[next_task].context);
     }
 }
 

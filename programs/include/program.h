@@ -38,19 +38,16 @@ struct program_api_t {
     const char *argument;
     const char *cwd;
     i64 (*read_file)(const char *path, ui32 offset, ui8 *buffer, ui32 size);
-    i64 (*list_directory)(const char *path, program_directory_entry_t *entries,
-                          ui32 capacity);
+    i64 (*list_directory)(const char *path, program_directory_entry_t *entries, ui32 capacity);
     i64 (*create_file)(const char *path);
     i64 (*create_directory)(const char *path);
-    i64 (*write_file)(const char *path, ui32 offset, const ui8 *buffer,
-                      ui32 size);
+    i64 (*write_file)(const char *path, ui32 offset, const ui8 *buffer, ui32 size);
     i64 (*rename_path)(const char *path, const char *new_path);
     i64 (*remove_path)(const char *path);
     bool (*read_input)(char *character);
     void (*clear_console)();
     void (*erase_console_char)();
-    bool (*run_program)(const char *path, const char *argument,
-                        const char *cwd);
+    bool (*run_program)(const char *path, const char *argument, const char *cwd);
     program_layer_t (*layer_create)(const program_layer_create_t *properties);
     void (*layer_destroy)(program_layer_t layer);
     void (*layer_set_position)(program_layer_t layer, i32 x, i32 y);

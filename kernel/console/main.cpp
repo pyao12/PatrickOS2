@@ -15,8 +15,7 @@ static layer_t *console_layer;
 static bool ensure_console_layer() {
     if (console_layer != 0)
         return true;
-    console_layer =
-        layer_create(console_x, console_y, console_width, console_height, 100);
+    console_layer = layer_create(console_x, console_y, console_width, console_height, 100);
     return console_layer != 0;
 }
 
@@ -53,8 +52,7 @@ void write_console(const char *str, ui32 color) {
             }
         } else {
             prepare_cursor();
-            print_char(console_layer, *cursor, current_char * 8,
-                       current_line * 16, color);
+            print_char(console_layer, *cursor, current_char * 8, current_line * 16, color);
             current_char++;
         }
     }
@@ -64,6 +62,5 @@ void erase_console_char() {
     if (current_char == 0)
         return;
     current_char--;
-    print_char(console_layer, ' ', current_char * 8, current_line * 16,
-               COLOR_WHITE);
+    print_char(console_layer, ' ', current_char * 8, current_line * 16, COLOR_WHITE);
 }

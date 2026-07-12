@@ -16,8 +16,7 @@ void layer_manager_init() {
         layers[index].active = false;
 }
 
-layer_t *layer_create(i32 x, i32 y, ui32 width, ui32 height, i32 z_index,
-                      bool raise_on_click) {
+layer_t *layer_create(i32 x, i32 y, ui32 width, ui32 height, i32 z_index, bool raise_on_click) {
     if (width == 0 || height == 0)
         return 0;
 
@@ -90,15 +89,12 @@ void layer_fill(layer_t *layer, ui32 color) {
 }
 
 void layer_draw_pixel(layer_t *layer, i32 x, i32 y, ui32 color) {
-    if (!layer_is_valid(layer) || x < 0 || y < 0 ||
-        x >= static_cast<i32>(layer->width) ||
-        y >= static_cast<i32>(layer->height))
+    if (!layer_is_valid(layer) || x < 0 || y < 0 || x >= static_cast<i32>(layer->width) || y >= static_cast<i32>(layer->height))
         return;
     layer->pixels[static_cast<ui64>(y) * layer->width + x] = color;
 }
 
-void layer_fill_rect(layer_t *layer, i32 x, i32 y, ui32 width, ui32 height,
-                     ui32 color) {
+void layer_fill_rect(layer_t *layer, i32 x, i32 y, ui32 width, ui32 height, ui32 color) {
     if (!layer_is_valid(layer))
         return;
     for (ui32 offset_y = 0; offset_y < height; offset_y++) {
@@ -118,14 +114,10 @@ void layer_compose() {
                 layer_t &layer   = layers[index];
                 i32      local_x = static_cast<i32>(x) - layer.x;
                 i32      local_y = static_cast<i32>(y) - layer.y;
-                if (!layer.active || !layer.visible || layer.z_index < top_z ||
-                    local_x < 0 || local_y < 0 ||
-                    local_x >= static_cast<i32>(layer.width) ||
-                    local_y >= static_cast<i32>(layer.height))
+                if (!layer.active || !layer.visible || layer.z_index < top_z || local_x < 0 || local_y < 0 ||
+                    local_x >= static_cast<i32>(layer.width) || local_y >= static_cast<i32>(layer.height))
                     continue;
-                ui32 pixel =
-                    layer.pixels[static_cast<ui64>(local_y) * layer.width +
-                                 local_x];
+                ui32 pixel = layer.pixels[static_cast<ui64>(local_y) * layer.width + local_x];
                 if (pixel != layer_transparent) {
                     color = pixel;
                     top_z = layer.z_index;
@@ -155,29 +147,24 @@ static void raise_clicked_layer(i32 x, i32 y) {
 
         i32 local_x = x - layer.x;
         i32 local_y = y - layer.y;
-        if (local_x < 0 || local_y < 0 ||
-            local_x >= static_cast<i32>(layer.width) ||
-            local_y >= static_cast<i32>(layer.height))
+        if (local_x < 0 || local_y < 0 || local_x >= static_cast<i32>(layer.width) || local_y >= static_cast<i32>(layer.height))
             continue;
 
-        ui32 pixel =
-            layer.pixels[static_cast<ui64>(local_y) * layer.width + local_x];
+        ui32 pixel = layer.pixels[static_cast<ui64>(local_y) * layer.width + local_x];
         if (pixel != layer_transparent && layer.z_index >= clicked_z) {
             clicked_layer = &layer;
             clicked_z     = layer.z_index;
         }
     }
 
-    if (clicked_layer != 0 && clicked_layer->raise_on_click &&
-        highest_layer != 0 && clicked_layer != highest_layer) {
+    if (clicked_layer != 0 && clicked_layer->raise_on_click && highest_layer != 0 && clicked_layer != highest_layer) {
         highest_layer->z_index = clicked_layer->z_index;
         clicked_layer->z_index = highest_z;
     }
 }
 
 static void create_examples() {
-    layer_t *desktop =
-        layer_create(0, 0, graphics_width(), graphics_height(), 0, false);
+    layer_t *desktop = layer_create(0, 0, graphics_width(), graphics_height(), 0, false);
     layer_t *panel   = layer_create(0, 0, graphics_width(), 28, 10);
     layer_t *window1 = layer_create(70, 70, 300, 190, 20);
     layer_t *window2 = layer_create(250, 170, 320, 210, 30);

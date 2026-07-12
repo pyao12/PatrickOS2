@@ -4,9 +4,7 @@
 
 #define COM1_PORT 0x03f8
 
-static void outb(ui16 port, ui8 value) {
-    asm("outb %0, %1" : : "a"(value), "Nd"(port));
-}
+static void outb(ui16 port, ui8 value) { asm("outb %0, %1" : : "a"(value), "Nd"(port)); }
 
 static ui8 inb(ui16 port) {
     ui8 result;

@@ -6,8 +6,7 @@ constexpr ui32 fat32_sector_size = 512;
 constexpr i64  fat32_read_error  = -1;
 
 typedef bool (*fat32_read_sector_fn)(void *context, ui32 lba, ui8 *buffer);
-typedef bool (*fat32_write_sector_fn)(void *context, ui32 lba,
-                                      const ui8 *buffer);
+typedef bool (*fat32_write_sector_fn)(void *context, ui32 lba, const ui8 *buffer);
 
 struct fat32_filesystem_t {
     fat32_read_sector_fn  read_sector;
@@ -39,11 +38,8 @@ struct fat32_directory_entry_t {
     fat32_directory_entry_t *next;
 };
 
-bool fat32_open(const fat32_filesystem_t *filesystem, const char *path,
-                fat32_file_t *file);
-i64  fat32_read(const fat32_file_t *file, ui32 offset, ui8 *buffer, ui32 size);
-bool fat32_directory_exists(const fat32_filesystem_t *filesystem,
-                            const char               *path);
-fat32_directory_entry_t *
-fat32_list_directory(const fat32_filesystem_t *filesystem, const char *path);
-void fat32_free_directory_list(fat32_directory_entry_t *entries);
+bool                     fat32_open(const fat32_filesystem_t *filesystem, const char *path, fat32_file_t *file);
+i64                      fat32_read(const fat32_file_t *file, ui32 offset, ui8 *buffer, ui32 size);
+bool                     fat32_directory_exists(const fat32_filesystem_t *filesystem, const char *path);
+fat32_directory_entry_t *fat32_list_directory(const fat32_filesystem_t *filesystem, const char *path);
+void                     fat32_free_directory_list(fat32_directory_entry_t *entries);

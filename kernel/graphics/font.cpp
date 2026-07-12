@@ -21,9 +21,7 @@ void print_char(layer_t *layer, char c, ui32 posx, ui32 posy, ui32 color) {
 
     for (int row = 0; row < 16; row++) {
         for (int col = 0; col < 8; col++) {
-            ui32 pixel = font_ASC16[row + index_begin] & (1 << col)
-                             ? color
-                             : COLOR_BLACK;
+            ui32 pixel = font_ASC16[row + index_begin] & (1 << col) ? color : COLOR_BLACK;
             layer_draw_pixel(layer, posx + 8 - col, posy + row, pixel);
         }
     }

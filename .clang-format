@@ -4,5 +4,6 @@ AlignConsecutiveDeclarations:
   Enabled: true
 BasedOnStyle: LLVM
 BreakBeforeBraces: Attach
+ColumnLimit: 128
 PointerAlignment: Right
 IndentWidth: 4

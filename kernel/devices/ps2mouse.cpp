@@ -16,9 +16,7 @@ static inline ui8 inb(ui16 port) {
     return value;
 }
 
-static inline void outb(ui16 port, ui8 value) {
-    asm("outb %0, %1" : : "a"(value), "Nd"(port));
-}
+static inline void outb(ui16 port, ui8 value) { asm("outb %0, %1" : : "a"(value), "Nd"(port)); }
 
 static bool wait_to_write() {
     for (ui32 attempt = 0; attempt < ps2_timeout; attempt++) {
@@ -58,8 +56,7 @@ static bool write_mouse(ui8 value) {
 }
 
 bool ps2mouse_init() {
-    if (!write_controller(0xA8) || !write_controller(0x20) ||
-        !wait_to_read(false))
+    if (!write_controller(0xA8) || !write_controller(0x20) || !wait_to_read(false))
         return false;
 
     ui8 configuration = inb(ps2_data_port);

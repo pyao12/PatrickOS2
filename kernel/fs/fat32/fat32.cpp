@@ -2,23 +2,16 @@
 
 static fat32_filesystem_t primary_filesystem;
 
-static ui16 read_le16(const ui8 *buffer) {
-    return (ui16)buffer[0] | ((ui16)buffer[1] << 8);
-}
+static ui16 read_le16(const ui8 *buffer) { return (ui16)buffer[0] | ((ui16)buffer[1] << 8); }
 
 static ui32 read_le32(const ui8 *buffer) {
-    return (ui32)buffer[0] | ((ui32)buffer[1] << 8) | ((ui32)buffer[2] << 16) |
-           ((ui32)buffer[3] << 24);
+    return (ui32)buffer[0] | ((ui32)buffer[1] << 8) | ((ui32)buffer[2] << 16) | ((ui32)buffer[3] << 24);
 }
 
-static bool is_power_of_two(ui8 value) {
-    return value != 0 && (value & (value - 1)) == 0;
-}
+static bool is_power_of_two(ui8 value) { return value != 0 && (value & (value - 1)) == 0; }
 
-bool fat32_mount(fat32_filesystem_t  *filesystem,
-                 fat32_read_sector_fn read_sector, void *read_context,
-                 ui32 partition_lba, fat32_write_sector_fn write_sector,
-                 void *write_context) {
+bool fat32_mount(fat32_filesystem_t *filesystem, fat32_read_sector_fn read_sector, void *read_context, ui32 partition_lba,
+                 fat32_write_sector_fn write_sector, void *write_context) {
     if (filesystem == 0 || read_sector == 0) {
         ;
         return false;
@@ -42,8 +35,7 @@ bool fat32_mount(fat32_filesystem_t  *filesystem,
         ;
         return false;
     }
-    if (read_le16(boot_sector + 510) != 0xaa55 ||
-        read_le16(boot_sector + 11) != fat32_sector_size) {
+    if (read_le16(boot_sector + 510) != 0xaa55 || read_le16(boot_sector + 11) != fat32_sector_size) {
         ;
         return false;
     }
@@ -59,16 +51,13 @@ bool fat32_mount(fat32_filesystem_t  *filesystem,
     if (total_sectors == 0)
         total_sectors = read_le32(boot_sector + 32);
 
-    if (!is_power_of_two(sectors_per_cluster) || sectors_per_cluster > 128 ||
-        reserved_sector_count == 0 || fat_count == 0 || root_entry_count != 0 ||
-        fat16_sectors != 0 || total_sectors == 0 || sectors_per_fat == 0 ||
-        root_cluster < 2) {
+    if (!is_power_of_two(sectors_per_cluster) || sectors_per_cluster > 128 || reserved_sector_count == 0 || fat_count == 0 ||
+        root_entry_count != 0 || fat16_sectors != 0 || total_sectors == 0 || sectors_per_fat == 0 || root_cluster < 2) {
         ;
         return false;
     }
 
-    ui64 metadata_sectors =
-        (ui64)reserved_sector_count + (ui64)fat_count * sectors_per_fat;
+    ui64 metadata_sectors = (ui64)reserved_sector_count + (ui64)fat_count * sectors_per_fat;
     if (metadata_sectors >= total_sectors) {
         ;
         return false;
@@ -78,8 +67,8 @@ bool fat32_mount(fat32_filesystem_t  *filesystem,
     ui32 cluster_count  = data_sectors / sectors_per_cluster;
     ui64 fat_start_lba  = (ui64)partition_lba + reserved_sector_count;
     ui64 data_start_lba = fat_start_lba + (ui64)fat_count * sectors_per_fat;
-    if (cluster_count == 0 || root_cluster > cluster_count + 1 ||
-        fat_start_lba > 0xffffffffULL || data_start_lba > 0xffffffffULL) {
+    if (cluster_count == 0 || root_cluster > cluster_count + 1 || fat_start_lba > 0xffffffffULL ||
+        data_start_lba > 0xffffffffULL) {
         ;
         return false;
     }
@@ -122,9 +111,7 @@ static ui16 ata_in16(ui16 port) {
     return value;
 }
 
-static void ata_out8(ui16 port, ui8 value) {
-    asm("outb %0, %1" : : "a"(value), "Nd"(port));
-}
+static void ata_out8(ui16 port, ui8 value) { asm("outb %0, %1" : : "a"(value), "Nd"(port)); }
 
 static bool ata_wait_ready() {
     for (ui32 index = 0; index < 1000000; index++) {
@@ -195,8 +182,7 @@ static bool ata_write_sector(void *context, ui32 lba, const ui8 *buffer) {
         return false;
 
     for (ui32 index = 0; index < fat32_sector_size / sizeof(ui16); index++) {
-        ui16 value =
-            (ui16)buffer[index * 2] | ((ui16)buffer[index * 2 + 1] << 8);
+        ui16 value = (ui16)buffer[index * 2] | ((ui16)buffer[index * 2 + 1] << 8);
         asm("outw %0, %1" : : "a"(value), "Nd"(ata_data_port));
     }
 
@@ -226,46 +212,29 @@ bool fat32_mount_primary_ata(fat32_filesystem_t *filesystem) {
             ;
             return false;
         }
-        return fat32_mount(filesystem, ata_read_sector, 0, partition_lba,
-                           ata_write_sector, 0);
+        return fat32_mount(filesystem, ata_read_sector, 0, partition_lba, ata_write_sector, 0);
     }
 
     ;
     return false;
 }
 
-bool fat32_mount_primary_ata() {
-    return fat32_mount_primary_ata(&primary_filesystem);
-}
+bool fat32_mount_primary_ata() { return fat32_mount_primary_ata(&primary_filesystem); }
 
-bool fat32_open(const char *path, fat32_file_t *file) {
-    return fat32_open(&primary_filesystem, path, file);
-}
+bool fat32_open(const char *path, fat32_file_t *file) { return fat32_open(&primary_filesystem, path, file); }
 
-bool fat32_directory_exists(const char *path) {
-    return fat32_directory_exists(&primary_filesystem, path);
-}
+bool fat32_directory_exists(const char *path) { return fat32_directory_exists(&primary_filesystem, path); }
 
-fat32_directory_entry_t *fat32_list_directory(const char *path) {
-    return fat32_list_directory(&primary_filesystem, path);
-}
+fat32_directory_entry_t *fat32_list_directory(const char *path) { return fat32_list_directory(&primary_filesystem, path); }
 
-bool fat32_create_file(const char *path) {
-    return fat32_create_file(&primary_filesystem, path);
-}
+bool fat32_create_file(const char *path) { return fat32_create_file(&primary_filesystem, path); }
 
-bool fat32_create_directory(const char *path) {
-    return fat32_create_directory(&primary_filesystem, path);
-}
+bool fat32_create_directory(const char *path) { return fat32_create_directory(&primary_filesystem, path); }
 
 i64 fat32_write(const char *path, ui32 offset, const ui8 *buffer, ui32 size) {
     return fat32_write(&primary_filesystem, path, offset, buffer, size);
 }
 
-bool fat32_rename(const char *path, const char *new_path) {
-    return fat32_rename(&primary_filesystem, path, new_path);
-}
+bool fat32_rename(const char *path, const char *new_path) { return fat32_rename(&primary_filesystem, path, new_path); }
 
-bool fat32_remove(const char *path) {
-    return fat32_remove(&primary_filesystem, path);
-}
+bool fat32_remove(const char *path) { return fat32_remove(&primary_filesystem, path); }
