@@ -35,13 +35,12 @@ static bool fat32_cluster_lba(const fat32_filesystem_t *filesystem,
 static ui32 fat32_next_cluster(const fat32_filesystem_t *filesystem,
                                ui32                      cluster) {
     if (!fat32_cluster_valid(filesystem, cluster)) {
-        fat32_panic("next_cluster: invalid cluster");
         return 0;
     }
 
     ui32 fat_sector = cluster / (fat32_sector_size / sizeof(ui32));
     if (fat_sector >= filesystem->sectors_per_fat) {
-        fat32_panic("next_cluster: FAT sector out of range");
+        ;
         return 0;
     }
 
@@ -49,7 +48,7 @@ static ui32 fat32_next_cluster(const fat32_filesystem_t *filesystem,
     if (!filesystem->read_sector(filesystem->read_context,
                                  filesystem->fat_start_lba + fat_sector,
                                  sector)) {
-        fat32_panic("next_cluster: failed to read FAT sector");
+        ;
         return 0;
     }
 
@@ -140,7 +139,7 @@ static bool fat32_find_in_directory(const fat32_filesystem_t *filesystem,
          cluster_index++) {
         ui32 cluster_lba;
         if (!fat32_cluster_lba(filesystem, cluster, &cluster_lba)) {
-            fat32_panic("find_in_directory: invalid cluster LBA");
+            ;
             return false;
         }
 
@@ -149,8 +148,6 @@ static bool fat32_find_in_directory(const fat32_filesystem_t *filesystem,
             ui8 sector[fat32_sector_size];
             if (!filesystem->read_sector(filesystem->read_context,
                                          cluster_lba + sector_index, sector)) {
-                fat32_panic(
-                    "find_in_directory: failed to read directory sector");
                 return false;
             }
 
@@ -176,7 +173,7 @@ static bool fat32_find_in_directory(const fat32_filesystem_t *filesystem,
         if (fat32_cluster_end(next_cluster))
             return false;
         if (!fat32_cluster_valid(filesystem, next_cluster)) {
-            fat32_panic("find_in_directory: invalid cluster chain");
+            ;
             return false;
         }
         cluster = next_cluster;
@@ -188,7 +185,7 @@ static bool fat32_find_in_directory(const fat32_filesystem_t *filesystem,
 bool fat32_open(const fat32_filesystem_t *filesystem, const char *path,
                 fat32_file_t *file) {
     if (filesystem == 0 || path == 0 || file == 0 || !filesystem->mounted) {
-        fat32_panic("open: invalid arguments");
+        ;
         return false;
     }
 
@@ -196,7 +193,7 @@ bool fat32_open(const fat32_filesystem_t *filesystem, const char *path,
     while (*cursor == '/')
         cursor++;
     if (*cursor == 0) {
-        fat32_panic("open: empty path");
+        ;
         return false;
     }
 
@@ -209,7 +206,7 @@ bool fat32_open(const fat32_filesystem_t *filesystem, const char *path,
 
         ui8 name[11];
         if (!fat32_make_name(segment_start, segment_length, name)) {
-            fat32_panic("open: invalid file name");
+            ;
             return false;
         }
 
@@ -217,7 +214,7 @@ bool fat32_open(const fat32_filesystem_t *filesystem, const char *path,
         while (*cursor == '/')
             cursor++;
         if (!final_segment && *cursor == 0) {
-            fat32_panic("open: trailing slash in path");
+            ;
             return false;
         }
 
@@ -231,7 +228,7 @@ bool fat32_open(const fat32_filesystem_t *filesystem, const char *path,
             ((ui32)read_le16(entry + 20) << 16) | read_le16(entry + 26);
         if (final_segment) {
             if (is_directory) {
-                fat32_panic("open: path is a directory");
+                ;
                 return false;
             }
             file->filesystem    = filesystem;
@@ -239,18 +236,18 @@ bool fat32_open(const fat32_filesystem_t *filesystem, const char *path,
             file->size          = read_le32(entry + 28);
             if (file->size != 0 &&
                 !fat32_cluster_valid(filesystem, first_cluster)) {
-                fat32_panic("open: invalid file cluster");
+                ;
                 return false;
             }
             return true;
         }
 
         if (!is_directory) {
-            fat32_panic("open: path is not a directory");
+            ;
             return false;
         }
         if (!fat32_cluster_valid(filesystem, first_cluster)) {
-            fat32_panic("open: invalid directory cluster");
+            ;
             return false;
         }
         directory_cluster = first_cluster;
@@ -260,7 +257,7 @@ bool fat32_open(const fat32_filesystem_t *filesystem, const char *path,
 i64 fat32_read(const fat32_file_t *file, ui32 offset, ui8 *buffer, ui32 size) {
     if (file == 0 || buffer == 0 || file->filesystem == 0 ||
         !file->filesystem->mounted) {
-        fat32_panic("read: invalid arguments");
+        ;
         return fat32_read_error;
     }
     if (offset >= file->size || size == 0)
@@ -280,7 +277,7 @@ i64 fat32_read(const fat32_file_t *file, ui32 offset, ui8 *buffer, ui32 size) {
     for (ui32 index = 0; index < clusters_to_skip; index++) {
         cluster = fat32_next_cluster(filesystem, cluster);
         if (!fat32_cluster_valid(filesystem, cluster)) {
-            fat32_panic("read: invalid cluster chain while skipping");
+            ;
             return fat32_read_error;
         }
     }
@@ -289,7 +286,7 @@ i64 fat32_read(const fat32_file_t *file, ui32 offset, ui8 *buffer, ui32 size) {
     while (remaining != 0) {
         ui32 cluster_lba;
         if (!fat32_cluster_lba(filesystem, cluster, &cluster_lba)) {
-            fat32_panic("read: invalid cluster LBA");
+            ;
             return fat32_read_error;
         }
 
@@ -300,7 +297,7 @@ i64 fat32_read(const fat32_file_t *file, ui32 offset, ui8 *buffer, ui32 size) {
             ui8 sector[fat32_sector_size];
             if (!filesystem->read_sector(filesystem->read_context,
                                          cluster_lba + sector_index, sector)) {
-                fat32_panic("read: failed to read sector");
+                ;
                 return fat32_read_error;
             }
 
@@ -321,7 +318,7 @@ i64 fat32_read(const fat32_file_t *file, ui32 offset, ui8 *buffer, ui32 size) {
         if (remaining != 0) {
             cluster = fat32_next_cluster(filesystem, cluster);
             if (!fat32_cluster_valid(filesystem, cluster)) {
-                fat32_panic("read: invalid cluster chain");
+                ;
                 return fat32_read_error;
             }
         }
@@ -333,7 +330,7 @@ i64 fat32_read(const fat32_file_t *file, ui32 offset, ui8 *buffer, ui32 size) {
 fat32_directory_entry_t *
 fat32_list_directory(const fat32_filesystem_t *filesystem, const char *path) {
     if (filesystem == 0 || path == 0 || !filesystem->mounted) {
-        fat32_panic("list_directory: invalid arguments");
+        ;
         return 0;
     }
 
@@ -350,7 +347,7 @@ fat32_list_directory(const fat32_filesystem_t *filesystem, const char *path) {
 
         ui8 name[11];
         if (!fat32_make_name(segment_start, segment_length, name)) {
-            fat32_panic("list_directory: invalid directory name");
+            ;
             return 0;
         }
 
@@ -363,14 +360,14 @@ fat32_list_directory(const fat32_filesystem_t *filesystem, const char *path) {
             return 0;
         }
         if ((entry[11] & 0x10) == 0) {
-            fat32_panic("list_directory: path is not a directory");
+            ;
             return 0;
         }
 
         ui32 first_cluster =
             ((ui32)read_le16(entry + 20) << 16) | read_le16(entry + 26);
         if (!fat32_cluster_valid(filesystem, first_cluster)) {
-            fat32_panic("list_directory: invalid cluster");
+            ;
             return 0;
         }
         directory_cluster = first_cluster;
@@ -383,7 +380,7 @@ fat32_list_directory(const fat32_filesystem_t *filesystem, const char *path) {
          cluster_index++) {
         ui32 cluster_lba;
         if (!fat32_cluster_lba(filesystem, cluster, &cluster_lba)) {
-            fat32_panic("list_directory: invalid cluster LBA");
+            ;
             break;
         }
 
@@ -393,7 +390,7 @@ fat32_list_directory(const fat32_filesystem_t *filesystem, const char *path) {
             if (!filesystem->read_sector(filesystem->read_context,
                                          cluster_lba + sector_index, sector)) {
                 fat32_free_directory_list(head);
-                fat32_panic("list_directory: failed to read sector");
+                ;
                 return 0;
             }
 
@@ -428,7 +425,7 @@ fat32_list_directory(const fat32_filesystem_t *filesystem, const char *path) {
         if (fat32_cluster_end(next_cluster))
             return head;
         if (!fat32_cluster_valid(filesystem, next_cluster)) {
-            fat32_panic("list_directory: invalid cluster chain");
+            ;
             break;
         }
         cluster = next_cluster;
@@ -441,7 +438,7 @@ fat32_list_directory(const fat32_filesystem_t *filesystem, const char *path) {
 bool fat32_directory_exists(const fat32_filesystem_t *filesystem,
                             const char               *path) {
     if (filesystem == 0 || path == 0 || !filesystem->mounted) {
-        fat32_panic("directory_exists: invalid arguments");
+        ;
         return false;
     }
 
@@ -460,7 +457,7 @@ bool fat32_directory_exists(const fat32_filesystem_t *filesystem,
 
         ui8 name[11];
         if (!fat32_make_name(segment_start, segment_length, name)) {
-            fat32_panic("directory_exists: invalid name");
+            ;
             return false;
         }
 
@@ -473,14 +470,14 @@ bool fat32_directory_exists(const fat32_filesystem_t *filesystem,
             return false;
         }
         if ((entry[11] & 0x10) == 0) {
-            fat32_panic("directory_exists: path is not a directory");
+            ;
             return false;
         }
 
         ui32 first_cluster =
             ((ui32)read_le16(entry + 20) << 16) | read_le16(entry + 26);
         if (!fat32_cluster_valid(filesystem, first_cluster)) {
-            fat32_panic("directory_exists: invalid cluster");
+            ;
             return false;
         }
         directory_cluster = first_cluster;

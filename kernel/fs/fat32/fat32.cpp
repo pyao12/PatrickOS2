@@ -20,7 +20,7 @@ bool fat32_mount(fat32_filesystem_t  *filesystem,
                  ui32 partition_lba, fat32_write_sector_fn write_sector,
                  void *write_context) {
     if (filesystem == 0 || read_sector == 0) {
-        fat32_panic("mount: null arguments");
+        ;
         return false;
     }
     filesystem->read_sector         = 0;
@@ -39,12 +39,12 @@ bool fat32_mount(fat32_filesystem_t  *filesystem,
 
     ui8 boot_sector[fat32_sector_size];
     if (!read_sector(read_context, partition_lba, boot_sector)) {
-        fat32_panic("mount: failed to read boot sector");
+        ;
         return false;
     }
     if (read_le16(boot_sector + 510) != 0xaa55 ||
         read_le16(boot_sector + 11) != fat32_sector_size) {
-        fat32_panic("mount: invalid boot sector");
+        ;
         return false;
     }
 
@@ -63,14 +63,14 @@ bool fat32_mount(fat32_filesystem_t  *filesystem,
         reserved_sector_count == 0 || fat_count == 0 || root_entry_count != 0 ||
         fat16_sectors != 0 || total_sectors == 0 || sectors_per_fat == 0 ||
         root_cluster < 2) {
-        fat32_panic("mount: invalid BIOS parameter block");
+        ;
         return false;
     }
 
     ui64 metadata_sectors =
         (ui64)reserved_sector_count + (ui64)fat_count * sectors_per_fat;
     if (metadata_sectors >= total_sectors) {
-        fat32_panic("mount: metadata exceeds total sectors");
+        ;
         return false;
     }
 
@@ -80,7 +80,7 @@ bool fat32_mount(fat32_filesystem_t  *filesystem,
     ui64 data_start_lba = fat_start_lba + (ui64)fat_count * sectors_per_fat;
     if (cluster_count == 0 || root_cluster > cluster_count + 1 ||
         fat_start_lba > 0xffffffffULL || data_start_lba > 0xffffffffULL) {
-        fat32_panic("mount: invalid filesystem geometry");
+        ;
         return false;
     }
 
@@ -206,13 +206,13 @@ static bool ata_write_sector(void *context, ui32 lba, const ui8 *buffer) {
 
 bool fat32_mount_primary_ata(fat32_filesystem_t *filesystem) {
     if (filesystem == 0) {
-        fat32_panic("mount_primary_ata: null filesystem");
+        ;
         return false;
     }
 
     ui8 mbr[fat32_sector_size];
     if (!ata_read_sector(0, 0, mbr) || read_le16(mbr + 510) != 0xaa55) {
-        fat32_panic("mount_primary_ata: failed to read MBR");
+        ;
         return false;
     }
 
@@ -223,14 +223,14 @@ bool fat32_mount_primary_ata(fat32_filesystem_t *filesystem) {
 
         ui32 partition_lba = read_le32(partition + 8);
         if (partition_lba == 0) {
-            fat32_panic("mount_primary_ata: invalid partition LBA");
+            ;
             return false;
         }
         return fat32_mount(filesystem, ata_read_sector, 0, partition_lba,
                            ata_write_sector, 0);
     }
 
-    fat32_panic("mount_primary_ata: no FAT32 partition found");
+    ;
     return false;
 }
 

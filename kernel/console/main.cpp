@@ -184,31 +184,6 @@ static void cmd_cd(const char *arg) {
     }
 }
 
-static void cmd_cat(const char *arg) {
-    if (arg[0] == 0) {
-        write_console("cat: missing file argument\n", COLOR_RED);
-        return;
-    }
-
-    char raw[max_path_len];
-    if (arg[0] == '/') {
-        str_copy(raw, arg, max_path_len);
-    } else {
-        str_concat(raw, cwd, arg, max_path_len);
-    }
-
-    char path[max_path_len];
-    resolve_path(raw, path, max_path_len);
-
-    if (!program_run("/programs/cat.elf", path, cwd))
-        write_console("cat: cannot load program\n", COLOR_RED);
-}
-
-static void cmd_ls() {
-    if (!program_run("/programs/ls.elf", cwd, cwd))
-        write_console("ls: cannot load program\n", COLOR_RED);
-}
-
 static void cmd_clear() {
     clear_screen();
     current_line = 0;
@@ -221,15 +196,47 @@ static void cmd_run(const char *arg) {
         return;
     }
 
+    char program_arg[max_path_len];
+    ui32 path_length = 0;
+    while (arg[path_length] != 0 && arg[path_length] != ' ')
+        path_length++;
+    if (arg[path_length] == ' ') {
+        str_copy(program_arg, arg + path_length + 1, max_path_len);
+    } else {
+        program_arg[0] = 0;
+    }
+
+    char resolved_arg[max_path_len];
+    if (program_arg[0] == '/') {
+        str_copy(resolved_arg, program_arg, max_path_len);
+    } else if (program_arg[0] != 0) {
+        char raw_arg[max_path_len];
+        str_concat(raw_arg, cwd, program_arg, max_path_len);
+        resolve_path(raw_arg, resolved_arg, max_path_len);
+    } else {
+        resolved_arg[0] = 0;
+    }
+
     char raw[max_path_len];
-    if (arg[0] == '/')
-        str_copy(raw, arg, max_path_len);
-    else
-        str_concat(raw, cwd, arg, max_path_len);
+    if (arg[0] == '/') {
+        for (ui32 index = 0; index < path_length && index + 1 < max_path_len;
+             index++) {
+            raw[index] = arg[index];
+        }
+        raw[path_length] = 0;
+    } else {
+        char program_path[max_path_len];
+        for (ui32 index = 0; index < path_length && index + 1 < max_path_len;
+             index++) {
+            program_path[index] = arg[index];
+        }
+        program_path[path_length] = 0;
+        str_concat(raw, cwd, program_path, max_path_len);
+    }
 
     char path[max_path_len];
     resolve_path(raw, path, max_path_len);
-    if (!program_run(path, "", cwd))
+    if (!program_run(path, resolved_arg, cwd))
         write_console("run: cannot load program\n", COLOR_RED);
 }
 
@@ -288,10 +295,6 @@ static void parse_and_exec(char *cmd) {
         cmd_help();
     } else if (str_eq(cmd, "cd")) {
         cmd_cd(arg);
-    } else if (str_eq(cmd, "ls")) {
-        cmd_ls();
-    } else if (str_eq(cmd, "cat")) {
-        cmd_cat(arg);
     } else if (str_eq(cmd, "run")) {
         cmd_run(arg);
     } else if (str_eq(cmd, "clear")) {

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <common.h>
-#include <devices/serial.h>
 
 constexpr ui32 fat32_sector_size = 512;
 constexpr i64  fat32_read_error  = -1;
@@ -39,13 +38,6 @@ struct fat32_directory_entry_t {
     ui32                     size;
     fat32_directory_entry_t *next;
 };
-
-static inline void fat32_panic(const char *msg) {
-    serial_write_str("[FS fat32] ");
-    serial_write_str(msg);
-    serial_write_char('\n');
-    halt();
-}
 
 bool fat32_open(const fat32_filesystem_t *filesystem, const char *path,
                 fat32_file_t *file);

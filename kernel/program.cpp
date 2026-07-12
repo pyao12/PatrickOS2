@@ -246,7 +246,7 @@ void destroy_address_space(program_address_space_t *program) {
     if (program->api != 0)
         memory_free_pages(program->api, 1);
     if (program->stack != 0)
-        memory_free_pages(program->stack, 1);
+        memory_free_pages(program->stack, 2);
     if (program->image != 0)
         memory_free_pages(program->image, program->image_pages);
 }
@@ -433,7 +433,7 @@ bool program_run(const char *path, const char *argument, const char *cwd) {
     ui64 image_size          = highest_address - lowest_address;
     program.image_pages      = image_size / page_size;
     program.image            = (ui8 *)memory_alloc_pages(program.image_pages);
-    program.stack            = (ui8 *)memory_alloc_pages(1);
+    program.stack            = (ui8 *)memory_alloc_pages(2);
     program.api              = (ui8 *)memory_alloc_pages(1);
     program.pml4             = (ui64 *)memory_alloc_pages(1);
     if (program.image == 0 || program.stack == 0 || program.api == 0 ||
@@ -442,7 +442,7 @@ bool program_run(const char *path, const char *argument, const char *cwd) {
         return false;
     }
     zero_pages(program.image, program.image_pages);
-    zero_pages(program.stack, 1);
+    zero_pages(program.stack, 2);
     zero_pages(program.api, 1);
 
     ui64 kernel_page_table;
@@ -566,11 +566,13 @@ bool program_run(const char *path, const char *argument, const char *cwd) {
         program.api[cwd_offset + index] = cwd[index];
     }
 
-    ui64 user_stack_top = user_stack_address + page_size - sizeof(ui64);
-    *(ui64 *)(program.stack + page_size - sizeof(ui64)) =
+    ui64 user_stack_top = user_stack_address + 2 * page_size - sizeof(ui64);
+    *(ui64 *)(program.stack + 2 * page_size - sizeof(ui64)) =
         user_api_address + exit_stub_offset;
     if (!map_user_page(&program, user_stack_address, (ui64)(uip)program.stack,
                        true, false) ||
+        !map_user_page(&program, user_stack_address + page_size,
+                       (ui64)(uip)program.stack + page_size, true, false) ||
         !map_user_page(&program, user_api_address, (ui64)(uip)program.api,
                        false, true)) {
         destroy_address_space(&program);

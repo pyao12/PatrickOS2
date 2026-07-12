@@ -57,14 +57,14 @@ static bool fat32_cluster_end(ui32 cluster) {
 static bool fat32_cluster_lba(const fat32_filesystem_t *filesystem,
                               ui32 cluster, ui32 *lba) {
     if (!fat32_cluster_valid(filesystem, cluster)) {
-        fat32_panic("cluster_lba: invalid cluster");
+        ;
         return false;
     }
 
     ui64 result = (ui64)filesystem->data_start_lba +
                   (ui64)(cluster - 2) * filesystem->sectors_per_cluster;
     if (result > 0xffffffffULL) {
-        fat32_panic("cluster_lba: cluster LBA overflow");
+        ;
         return false;
     }
 
@@ -90,21 +90,21 @@ static bool fat32_write_sector(const fat32_filesystem_t *filesystem, ui32 lba,
 static bool fat32_read_fat_entry(const fat32_filesystem_t *filesystem,
                                  ui32 cluster, ui32 *value) {
     if (!fat32_cluster_valid(filesystem, cluster) || value == 0) {
-        fat32_panic("read_fat_entry: invalid arguments");
+        ;
         return false;
     }
 
     ui32 entries_per_sector = fat32_sector_size / sizeof(ui32);
     ui32 fat_sector         = cluster / entries_per_sector;
     if (fat_sector >= filesystem->sectors_per_fat) {
-        fat32_panic("read_fat_entry: FAT sector out of range");
+        ;
         return false;
     }
 
     ui8 sector[fat32_sector_size];
     if (!fat32_read_sector(filesystem, filesystem->fat_start_lba + fat_sector,
                            sector)) {
-        fat32_panic("read_fat_entry: failed to read FAT sector");
+        ;
         return false;
     }
 
@@ -124,14 +124,14 @@ static ui32 fat32_next_cluster(const fat32_filesystem_t *filesystem,
 static bool fat32_write_fat_entry(const fat32_filesystem_t *filesystem,
                                   ui32 cluster, ui32 value) {
     if (!fat32_cluster_valid(filesystem, cluster)) {
-        fat32_panic("write_fat_entry: invalid cluster");
+        ;
         return false;
     }
 
     ui32 entries_per_sector = fat32_sector_size / sizeof(ui32);
     ui32 fat_sector         = cluster / entries_per_sector;
     if (fat_sector >= filesystem->sectors_per_fat) {
-        fat32_panic("write_fat_entry: FAT sector out of range");
+        ;
         return false;
     }
 
@@ -141,13 +141,13 @@ static bool fat32_write_fat_entry(const fat32_filesystem_t *filesystem,
                    fat_index * filesystem->sectors_per_fat + fat_sector;
         ui8 sector[fat32_sector_size];
         if (!fat32_read_sector(filesystem, lba, sector)) {
-            fat32_panic("write_fat_entry: failed to read FAT sector");
+            ;
             return false;
         }
         ui32 existing = read_le32(sector + offset) & 0xf0000000;
         write_le32(sector + offset, existing | (value & 0x0fffffff));
         if (!fat32_write_sector(filesystem, lba, sector)) {
-            fat32_panic("write_fat_entry: failed to write FAT sector");
+            ;
             return false;
         }
     }
@@ -167,7 +167,7 @@ static bool fat32_zero_cluster(const fat32_filesystem_t *filesystem,
          sector_index++) {
         if (!fat32_write_sector(filesystem, cluster_lba + sector_index,
                                 sector)) {
-            fat32_panic("zero_cluster: failed to write sector");
+            ;
             return false;
         }
     }
@@ -177,7 +177,7 @@ static bool fat32_zero_cluster(const fat32_filesystem_t *filesystem,
 static bool fat32_allocate_cluster(const fat32_filesystem_t *filesystem,
                                    ui32                     *cluster_out) {
     if (cluster_out == 0) {
-        fat32_panic("allocate_cluster: null output");
+        ;
         return false;
     }
 
@@ -196,7 +196,7 @@ static bool fat32_allocate_cluster(const fat32_filesystem_t *filesystem,
         return true;
     }
 
-    fat32_panic("allocate_cluster: no free clusters");
+    ;
     return false;
 }
 
@@ -210,7 +210,7 @@ static bool fat32_free_cluster_chain(const fat32_filesystem_t *filesystem,
         if (fat32_cluster_end(next_cluster))
             return true;
         if (!fat32_cluster_valid(filesystem, next_cluster)) {
-            fat32_panic("free_cluster_chain: invalid cluster chain");
+            ;
             return false;
         }
         cluster = next_cluster;
@@ -303,12 +303,12 @@ static bool fat32_write_entry_at(const fat32_filesystem_t     *filesystem,
                                  const ui8                     entry[32]) {
     ui8 sector[fat32_sector_size];
     if (!fat32_read_sector(filesystem, location.sector_lba, sector)) {
-        fat32_panic("write_entry: failed to read sector");
+        ;
         return false;
     }
     copy_bytes(sector + location.offset, entry, 32);
     if (!fat32_write_sector(filesystem, location.sector_lba, sector)) {
-        fat32_panic("write_entry: failed to write sector");
+        ;
         return false;
     }
     return true;
@@ -330,7 +330,7 @@ static bool fat32_find_in_directory(const fat32_filesystem_t *filesystem,
             ui8  sector[fat32_sector_size];
             ui32 sector_lba = cluster_lba + sector_index;
             if (!fat32_read_sector(filesystem, sector_lba, sector)) {
-                fat32_panic("find_in_directory: failed to read sector");
+                ;
                 return false;
             }
 
@@ -360,7 +360,7 @@ static bool fat32_find_in_directory(const fat32_filesystem_t *filesystem,
         if (fat32_cluster_end(next_cluster))
             return false;
         if (!fat32_cluster_valid(filesystem, next_cluster)) {
-            fat32_panic("find_in_directory: invalid cluster chain");
+            ;
             return false;
         }
         cluster = next_cluster;
@@ -373,7 +373,7 @@ static bool fat32_find_free_directory_slot(const fat32_filesystem_t *filesystem,
                                            ui32 directory_cluster,
                                            fat32_entry_location_t *location) {
     if (location == 0) {
-        fat32_panic("find_free_slot: null location");
+        ;
         return false;
     }
 
@@ -389,7 +389,7 @@ static bool fat32_find_free_directory_slot(const fat32_filesystem_t *filesystem,
             ui8  sector[fat32_sector_size];
             ui32 sector_lba = cluster_lba + sector_index;
             if (!fat32_read_sector(filesystem, sector_lba, sector)) {
-                fat32_panic("find_free_slot: failed to read sector");
+                ;
                 return false;
             }
 
@@ -413,7 +413,7 @@ static bool fat32_find_free_directory_slot(const fat32_filesystem_t *filesystem,
                                        fat32_end_of_chain) ||
                 !fat32_cluster_lba(filesystem, new_cluster,
                                    &location->sector_lba)) {
-                fat32_panic("find_free_slot: failed to extend directory");
+                ;
                 return false;
             }
             location->cluster = new_cluster;
@@ -423,7 +423,7 @@ static bool fat32_find_free_directory_slot(const fat32_filesystem_t *filesystem,
             return true;
         }
         if (!fat32_cluster_valid(filesystem, next_cluster)) {
-            fat32_panic("find_free_slot: invalid cluster chain");
+            ;
             return false;
         }
         previous = cluster;
@@ -438,7 +438,7 @@ static bool fat32_resolve_parent(const fat32_filesystem_t *filesystem,
                                  bool                   *exists) {
     if (!fat32_mount_writable(filesystem) || path == 0 || parent_cluster == 0 ||
         name == 0 || exists == 0) {
-        fat32_panic("resolve_parent: invalid arguments");
+        ;
         return false;
     }
 
@@ -446,7 +446,7 @@ static bool fat32_resolve_parent(const fat32_filesystem_t *filesystem,
     while (*cursor == '/')
         cursor++;
     if (*cursor == 0) {
-        fat32_panic("resolve_parent: empty path");
+        ;
         return false;
     }
 
@@ -457,13 +457,13 @@ static bool fat32_resolve_parent(const fat32_filesystem_t *filesystem,
             cursor++;
         ui32 segment_length = (ui32)(cursor - segment_start);
         if (segment_length == 0) {
-            fat32_panic("resolve_parent: empty path segment");
+            ;
             return false;
         }
 
         ui8 segment_name[11];
         if (!fat32_make_name(segment_start, segment_length, segment_name)) {
-            fat32_panic("resolve_parent: invalid name");
+            ;
             return false;
         }
 
@@ -471,7 +471,7 @@ static bool fat32_resolve_parent(const fat32_filesystem_t *filesystem,
         while (*cursor == '/')
             cursor++;
         if (!final_segment && *cursor == 0) {
-            fat32_panic("resolve_parent: trailing slash");
+            ;
             return false;
         }
 
@@ -486,17 +486,17 @@ static bool fat32_resolve_parent(const fat32_filesystem_t *filesystem,
         fat32_entry_location_t child;
         if (!fat32_find_in_directory(filesystem, directory_cluster,
                                      segment_name, &child)) {
-            fat32_panic("resolve_parent: directory not found");
+            ;
             return false;
         }
         if ((child.entry[11] & fat32_attribute_directory) == 0) {
-            fat32_panic("resolve_parent: path is not a directory");
+            ;
             return false;
         }
 
         ui32 child_cluster = fat32_entry_first_cluster(child.entry);
         if (!fat32_cluster_valid(filesystem, child_cluster)) {
-            fat32_panic("resolve_parent: invalid child cluster");
+            ;
             return false;
         }
         directory_cluster = child_cluster;
@@ -508,7 +508,7 @@ fat32_update_entry_size_and_cluster(const fat32_filesystem_t *filesystem,
                                     fat32_entry_location_t   *location,
                                     ui32 first_cluster, ui32 size) {
     if (location == 0) {
-        fat32_panic("update_entry: null location");
+        ;
         return false;
     }
     fat32_entry_set_first_cluster(location->entry, first_cluster);
@@ -519,7 +519,7 @@ fat32_update_entry_size_and_cluster(const fat32_filesystem_t *filesystem,
 static bool fat32_directory_parent_cluster(const fat32_filesystem_t *filesystem,
                                            ui32 cluster, ui32 *parent_cluster) {
     if (parent_cluster == 0) {
-        fat32_panic("directory_parent: null output");
+        ;
         return false;
     }
     if (cluster == filesystem->root_cluster) {
@@ -533,12 +533,12 @@ static bool fat32_directory_parent_cluster(const fat32_filesystem_t *filesystem,
 
     ui8 sector[fat32_sector_size];
     if (!fat32_read_sector(filesystem, cluster_lba, sector)) {
-        fat32_panic("directory_parent: failed to read sector");
+        ;
         return false;
     }
     const ui8 *entry = sector + 32;
     if (entry[0] != '.' || entry[1] != '.') {
-        fat32_panic("directory_parent: invalid dotdot entry");
+        ;
         return false;
     }
 
@@ -575,7 +575,7 @@ static bool fat32_directory_empty(const fat32_filesystem_t *filesystem,
             ui8 sector[fat32_sector_size];
             if (!fat32_read_sector(filesystem, cluster_lba + sector_index,
                                    sector)) {
-                fat32_panic("directory_empty: failed to read sector");
+                ;
                 return false;
             }
             for (ui32 offset = 0; offset < fat32_sector_size; offset += 32) {
@@ -596,7 +596,7 @@ static bool fat32_directory_empty(const fat32_filesystem_t *filesystem,
         if (fat32_cluster_end(next_cluster))
             return true;
         if (!fat32_cluster_valid(filesystem, next_cluster)) {
-            fat32_panic("directory_empty: invalid cluster chain");
+            ;
             return false;
         }
         cluster = next_cluster;
@@ -609,14 +609,14 @@ static bool fat32_nth_cluster(const fat32_filesystem_t *filesystem,
                               ui32 first_cluster, ui32 index,
                               ui32 *cluster_out) {
     if (cluster_out == 0) {
-        fat32_panic("nth_cluster: null output");
+        ;
         return false;
     }
     ui32 cluster = first_cluster;
     for (ui32 current = 0; current < index; current++) {
         cluster = fat32_next_cluster(filesystem, cluster);
         if (!fat32_cluster_valid(filesystem, cluster)) {
-            fat32_panic("nth_cluster: invalid cluster chain");
+            ;
             return false;
         }
     }
@@ -628,7 +628,7 @@ static bool fat32_chain_length(const fat32_filesystem_t *filesystem,
                                ui32 first_cluster, ui32 *length,
                                ui32 *last_cluster) {
     if (length == 0 || last_cluster == 0) {
-        fat32_panic("chain_length: null arguments");
+        ;
         return false;
     }
     if (first_cluster == 0) {
@@ -637,7 +637,7 @@ static bool fat32_chain_length(const fat32_filesystem_t *filesystem,
         return true;
     }
     if (!fat32_cluster_valid(filesystem, first_cluster)) {
-        fat32_panic("chain_length: invalid first cluster");
+        ;
         return false;
     }
 
@@ -651,19 +651,18 @@ static bool fat32_chain_length(const fat32_filesystem_t *filesystem,
             return true;
         }
         if (!fat32_cluster_valid(filesystem, next_cluster)) {
-            fat32_panic("chain_length: invalid cluster chain");
+            ;
             return false;
         }
         cluster = next_cluster;
-    }
-    fat32_panic("chain_length: chain exceeds cluster count");
+    };
     return false;
 }
 
 static bool fat32_resize_chain(const fat32_filesystem_t *filesystem,
                                ui32 *first_cluster, ui32 cluster_count) {
     if (first_cluster == 0) {
-        fat32_panic("resize_chain: null cluster pointer");
+        ;
         return false;
     }
 
@@ -694,7 +693,7 @@ static bool fat32_resize_chain(const fat32_filesystem_t *filesystem,
             !fat32_write_fat_entry(filesystem, last_cluster, new_cluster) ||
             !fat32_write_fat_entry(filesystem, new_cluster,
                                    fat32_end_of_chain)) {
-            fat32_panic("resize_chain: failed to extend chain");
+            ;
             return false;
         }
         last_cluster = new_cluster;
@@ -711,7 +710,7 @@ static bool fat32_resize_chain(const fat32_filesystem_t *filesystem,
 
     ui32 tail = fat32_next_cluster(filesystem, keep_last);
     if (!fat32_write_fat_entry(filesystem, keep_last, fat32_end_of_chain)) {
-        fat32_panic("resize_chain: failed to update FAT");
+        ;
         return false;
     }
     if (fat32_cluster_valid(filesystem, tail))
@@ -725,7 +724,7 @@ static bool fat32_write_range(const fat32_filesystem_t *filesystem,
     if (size == 0)
         return true;
     if (!fat32_cluster_valid(filesystem, first_cluster)) {
-        fat32_panic("write_range: invalid first cluster");
+        ;
         return false;
     }
 
@@ -738,7 +737,7 @@ static bool fat32_write_range(const fat32_filesystem_t *filesystem,
     for (ui32 index = 0; index < clusters_to_skip; index++) {
         cluster = fat32_next_cluster(filesystem, cluster);
         if (!fat32_cluster_valid(filesystem, cluster)) {
-            fat32_panic("write_range: invalid cluster chain");
+            ;
             return false;
         }
     }
@@ -761,7 +760,7 @@ static bool fat32_write_range(const fat32_filesystem_t *filesystem,
 
             if (sector_offset != 0 || chunk != fat32_sector_size) {
                 if (!fat32_read_sector(filesystem, sector_lba, sector)) {
-                    fat32_panic("write_range: failed to read sector");
+                    ;
                     return false;
                 }
             } else {
@@ -776,7 +775,7 @@ static bool fat32_write_range(const fat32_filesystem_t *filesystem,
             }
 
             if (!fat32_write_sector(filesystem, sector_lba, sector)) {
-                fat32_panic("write_range: failed to write sector");
+                ;
                 return false;
             }
             bytes_written += chunk;
@@ -788,7 +787,7 @@ static bool fat32_write_range(const fat32_filesystem_t *filesystem,
         if (bytes_written < size) {
             cluster = fat32_next_cluster(filesystem, cluster);
             if (!fat32_cluster_valid(filesystem, cluster)) {
-                fat32_panic("write_range: invalid cluster chain");
+                ;
                 return false;
             }
         }
@@ -813,7 +812,7 @@ static bool fat32_write_dot_entries(const fat32_filesystem_t *filesystem,
 
     ui8 sector[fat32_sector_size];
     if (!fat32_read_sector(filesystem, cluster_lba, sector)) {
-        fat32_panic("write_dot_entries: failed to read sector");
+        ;
         return false;
     }
 
@@ -846,13 +845,13 @@ bool fat32_create_file(fat32_filesystem_t *filesystem, const char *path) {
         return false;
     }
     if (exists) {
-        fat32_panic("create_file: file already exists");
+        ;
         return false;
     }
 
     fat32_entry_location_t slot;
     if (!fat32_find_free_directory_slot(filesystem, parent_cluster, &slot)) {
-        fat32_panic("create_file: failed to find free directory slot");
+        ;
         return false;
     }
 
@@ -871,7 +870,7 @@ bool fat32_create_directory(fat32_filesystem_t *filesystem, const char *path) {
         return false;
     }
     if (exists) {
-        fat32_panic("create_directory: directory already exists");
+        ;
         return false;
     }
 
@@ -880,14 +879,14 @@ bool fat32_create_directory(fat32_filesystem_t *filesystem, const char *path) {
         !fat32_write_dot_entries(filesystem, cluster, parent_cluster)) {
         if (cluster != 0)
             fat32_free_cluster_chain(filesystem, cluster);
-        fat32_panic("create_directory: failed to create directory cluster");
+        ;
         return false;
     }
 
     fat32_entry_location_t slot;
     if (!fat32_find_free_directory_slot(filesystem, parent_cluster, &slot)) {
         fat32_free_cluster_chain(filesystem, cluster);
-        fat32_panic("create_directory: failed to find free directory slot");
+        ;
         return false;
     }
 
@@ -895,7 +894,7 @@ bool fat32_create_directory(fat32_filesystem_t *filesystem, const char *path) {
     fat32_build_entry(entry, name, fat32_attribute_directory, cluster, 0);
     if (!fat32_write_entry_at(filesystem, slot, entry)) {
         fat32_free_cluster_chain(filesystem, cluster);
-        fat32_panic("create_directory: failed to write directory entry");
+        ;
         return false;
     }
     return true;
@@ -905,7 +904,7 @@ i64 fat32_write(fat32_filesystem_t *filesystem, const char *path, ui32 offset,
                 const ui8 *buffer, ui32 size) {
     if (!fat32_mount_writable(filesystem) || path == 0 ||
         (buffer == 0 && size != 0)) {
-        fat32_panic("write: invalid arguments");
+        ;
         return fat32_write_error;
     }
 
@@ -919,7 +918,7 @@ i64 fat32_write(fat32_filesystem_t *filesystem, const char *path, ui32 offset,
         return fat32_write_error;
     }
     if ((location.entry[11] & fat32_attribute_directory) != 0) {
-        fat32_panic("write: path is a directory");
+        ;
         return fat32_write_error;
     }
 
@@ -927,7 +926,7 @@ i64 fat32_write(fat32_filesystem_t *filesystem, const char *path, ui32 offset,
     ui32 first_cluster = fat32_entry_first_cluster(location.entry);
     ui64 end_offset    = (ui64)offset + size;
     if (end_offset > 0xffffffffULL) {
-        fat32_panic("write: offset overflow");
+        ;
         return fat32_write_error;
     }
 
@@ -940,25 +939,25 @@ i64 fat32_write(fat32_filesystem_t *filesystem, const char *path, ui32 offset,
     ui32 required_clusters =
         new_size == 0 ? 0 : (new_size + cluster_size - 1) / cluster_size;
     if (!fat32_resize_chain(filesystem, &first_cluster, required_clusters)) {
-        fat32_panic("write: failed to resize cluster chain");
+        ;
         return fat32_write_error;
     }
 
     if (offset > file_size && first_cluster != 0 &&
         !fat32_write_range(filesystem, first_cluster, file_size, 0,
                            offset - file_size, true)) {
-        fat32_panic("write: failed to zero-fill gap");
+        ;
         return fat32_write_error;
     }
     if (size != 0 && !fat32_write_range(filesystem, first_cluster, offset,
                                         buffer, size, false)) {
-        fat32_panic("write: failed to write data");
+        ;
         return fat32_write_error;
     }
 
     if (!fat32_update_entry_size_and_cluster(filesystem, &location,
                                              first_cluster, new_size)) {
-        fat32_panic("write: failed to update directory entry");
+        ;
         return fat32_write_error;
     }
     return size;
@@ -975,7 +974,7 @@ bool fat32_rename(fat32_filesystem_t *filesystem, const char *path,
         return false;
     }
     if (!source_exists) {
-        fat32_panic("rename: source not found");
+        ;
         return false;
     }
 
@@ -988,7 +987,7 @@ bool fat32_rename(fat32_filesystem_t *filesystem, const char *path,
         return false;
     }
     if (target_exists) {
-        fat32_panic("rename: target already exists");
+        ;
         return false;
     }
 
@@ -998,7 +997,7 @@ bool fat32_rename(fat32_filesystem_t *filesystem, const char *path,
     if (source_is_directory && target_parent_cluster != source_parent_cluster &&
         fat32_directory_is_descendant(filesystem, target_parent_cluster,
                                       source_cluster)) {
-        fat32_panic("rename: cannot rename to descendant");
+        ;
         return false;
     }
 
@@ -1010,7 +1009,7 @@ bool fat32_rename(fat32_filesystem_t *filesystem, const char *path,
     fat32_entry_location_t slot;
     if (!fat32_find_free_directory_slot(filesystem, target_parent_cluster,
                                         &slot)) {
-        fat32_panic("rename: failed to find free directory slot");
+        ;
         return false;
     }
 
@@ -1024,7 +1023,7 @@ bool fat32_rename(fat32_filesystem_t *filesystem, const char *path,
         !fat32_write_dot_entries(filesystem, source_cluster,
                                  target_parent_cluster)) {
         fat32_mark_entry_deleted(filesystem, slot);
-        fat32_panic("rename: failed to update dot entries");
+        ;
         return false;
     }
 
@@ -1041,7 +1040,7 @@ bool fat32_remove(fat32_filesystem_t *filesystem, const char *path) {
         return false;
     }
     if (!exists) {
-        fat32_panic("remove: file not found");
+        ;
         return false;
     }
 
@@ -1050,14 +1049,14 @@ bool fat32_remove(fat32_filesystem_t *filesystem, const char *path) {
     if (is_directory) {
         if (!fat32_cluster_valid(filesystem, first_cluster) ||
             !fat32_directory_empty(filesystem, first_cluster)) {
-            fat32_panic("remove: directory not empty or invalid");
+            ;
             return false;
         }
     }
 
     if (first_cluster != 0 &&
         !fat32_free_cluster_chain(filesystem, first_cluster)) {
-        fat32_panic("remove: failed to free cluster chain");
+        ;
         return false;
     }
     return fat32_mark_entry_deleted(filesystem, location);

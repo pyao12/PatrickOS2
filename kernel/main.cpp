@@ -40,7 +40,7 @@ extern "C" void kernel_main(ui32 mb_info_addr) {
     if (ps2mouse_init() && scheduler_create_task(ps2mouse_main, 0) < 0)
         halt();
 
-    serial_write_str("Kernel prepared well, scheduler start.");
+    serial_write_str("Kernel prepared well, scheduler start.\n\n");
     scheduler_run();
 
     halt();
