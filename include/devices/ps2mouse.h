@@ -12,5 +12,6 @@ typedef struct ps2_mouse_state {
 } ps2_mouse_state_t;
 
 bool              ps2mouse_init();
+extern "C" void   ps2mouse_interrupt();
 ps2_mouse_state_t ps2mouse_get_state();
 void              ps2mouse_main(void *arg);

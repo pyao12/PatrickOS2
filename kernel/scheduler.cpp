@@ -26,8 +26,8 @@ void scheduler_timer_init() {
     scheduler_outb(0xa1, 0x02);
     scheduler_outb(0x21, 0x01);
     scheduler_outb(0xa1, 0x01);
-    scheduler_outb(0x21, 0xfe);
-    scheduler_outb(0xa1, 0xff);
+    scheduler_outb(0x21, 0xf9);
+    scheduler_outb(0xa1, 0xef);
 
     ui16 divisor = (ui16)(pit_input_frequency / pit_frequency);
     scheduler_outb(0x43, 0x36);

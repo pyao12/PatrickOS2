@@ -210,6 +210,8 @@ x86_exception_stubs:
 
 .section .text
 .extern scheduler_timer_interrupt
+.extern keyboard_interrupt
+.extern ps2mouse_interrupt
 .global scheduler_timer_interrupt_stub
 .type scheduler_timer_interrupt_stub, @function
 scheduler_timer_interrupt_stub:
@@ -249,3 +251,48 @@ scheduler_timer_interrupt_stub:
     pop %rbx
     pop %rax
     iretq
+
+.macro IRQ_STUB name, handler
+.global \name
+.type \name, @function
+\name:
+    cld
+    push %rax
+    push %rbx
+    push %rcx
+    push %rdx
+    push %rsi
+    push %rdi
+    push %rbp
+    push %r8
+    push %r9
+    push %r10
+    push %r11
+    push %r12
+    push %r13
+    push %r14
+    push %r15
+    mov %rsp, %rbx
+    andq $-16, %rsp
+    call \handler
+    mov %rbx, %rsp
+    pop %r15
+    pop %r14
+    pop %r13
+    pop %r12
+    pop %r11
+    pop %r10
+    pop %r9
+    pop %r8
+    pop %rbp
+    pop %rdi
+    pop %rsi
+    pop %rdx
+    pop %rcx
+    pop %rbx
+    pop %rax
+    iretq
+.endm
+
+IRQ_STUB keyboard_interrupt_stub, keyboard_interrupt
+IRQ_STUB ps2mouse_interrupt_stub, ps2mouse_interrupt

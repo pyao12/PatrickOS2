@@ -7,6 +7,8 @@ static constexpr ui16 ps2_status_port = 0x64;
 static constexpr ui32 ps2_timeout     = 100000;
 
 static ps2_mouse_state_t mouse_state = {};
+static ui8               mouse_packet[3];
+static ui8               mouse_packet_index;
 
 static inline ui8 inb(ui16 port) {
     ui8 value;
@@ -61,7 +63,7 @@ bool ps2mouse_init() {
         return false;
 
     ui8 configuration = inb(ps2_data_port);
-    configuration &= static_cast<ui8>(~0x22);
+    configuration     = (configuration | 0x03) & static_cast<ui8>(~0x20);
     if (!write_controller(0x60) || !write_data(configuration))
         return false;
 
@@ -69,6 +71,32 @@ bool ps2mouse_init() {
         return false;
     graphics_move_cursor(0, 0);
     return true;
+}
+
+extern "C" void ps2mouse_interrupt() {
+    ui8 value = inb(ps2_data_port);
+    outb(0xa0, 0x20);
+    outb(0x20, 0x20);
+    if (mouse_packet_index == 0 && !(value & 0x08))
+        return;
+
+    mouse_packet[mouse_packet_index++] = value;
+    if (mouse_packet_index != 3)
+        return;
+
+    mouse_packet_index = 0;
+    if (mouse_packet[0] & 0xC0)
+        return;
+
+    i8 delta_x = static_cast<i8>(mouse_packet[1]);
+    i8 delta_y = static_cast<i8>(mouse_packet[2]);
+    mouse_state.x += delta_x;
+    mouse_state.y += delta_y;
+    mouse_state.left_button   = mouse_packet[0] & 0x01;
+    mouse_state.right_button  = mouse_packet[0] & 0x02;
+    mouse_state.middle_button = mouse_packet[0] & 0x04;
+    mouse_state.packet_count++;
+    graphics_move_cursor(delta_x, -delta_y);
 }
 
 ps2_mouse_state_t ps2mouse_get_state() { return mouse_state; }

@@ -37,6 +37,8 @@ alignas(16) idt_entry_t idt[256];
 alignas(16) ui8 double_fault_stack[16384];
 
 extern "C" void             *x86_exception_stubs[32];
+extern "C" void              keyboard_interrupt_stub();
+extern "C" void              ps2mouse_interrupt_stub();
 extern "C" void              x86_syscall_stub(); // 在 user.s 中定义
 extern "C" void              x86_load_tables(const table_descriptor_t *,
                                              const table_descriptor_t *, ui16);
@@ -82,6 +84,8 @@ void x86_init() {
                       vector == 8 ? 1 : 0);
     }
     set_idt_entry(0x80, (void *)x86_syscall_stub, user_interrupt_gate);
+    set_idt_entry(0x21, (void *)keyboard_interrupt_stub, interrupt_gate);
+    set_idt_entry(0x2c, (void *)ps2mouse_interrupt_stub, interrupt_gate);
 
     table_descriptor_t gdt_descriptor = {(ui16)(sizeof(gdt) - 1),
                                          (ui64)(uip)gdt};

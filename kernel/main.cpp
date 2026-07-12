@@ -45,9 +45,9 @@ extern "C" void kernel_main(ui32 mb_info_addr) {
         halt();
     if (scheduler_create_task(layer_manager_main, 0) < 0)
         halt();
-    if (scheduler_create_task(keyboard_main, 0) < 0)
-        halt();
-    if (ps2mouse_init() && scheduler_create_task(ps2mouse_main, 0) < 0)
+    if (ps2mouse_init())
+        ;
+    else
         halt();
 
     serial_write_str("Kernel prepared well, scheduler start.\n\n");
