@@ -100,6 +100,10 @@ void x86_init() {
         : "rax", "memory");
 }
 
+void x86_set_interrupt_handler(ui8 vector, void *handler) {
+    set_idt_entry(vector, handler, interrupt_gate);
+}
+
 bool x86_enter_user(ui64 entry, ui64 stack, ui64 argument, ui64 page_table) {
     return x86_enter_user_asm(entry, stack, argument, page_table);
 }

@@ -1,5 +1,41 @@
 #include <devices/serial.h>
 #include <scheduler.h>
+#include <x86.h>
+
+namespace {
+
+constexpr ui8  pit_interrupt_vector = 0x20;
+constexpr ui32 pit_frequency        = 500;
+constexpr ui32 pit_input_frequency  = 1193182;
+
+extern "C" void scheduler_timer_interrupt_stub();
+
+void scheduler_outb(ui16 port, ui8 value) {
+    asm("outb %0, %1" : : "a"(value), "Nd"(port));
+}
+
+void scheduler_timer_init() {
+    x86_set_interrupt_handler(pit_interrupt_vector,
+                              (void *)scheduler_timer_interrupt_stub);
+
+    scheduler_outb(0x20, 0x11);
+    scheduler_outb(0xa0, 0x11);
+    scheduler_outb(0x21, 0x20);
+    scheduler_outb(0xa1, 0x28);
+    scheduler_outb(0x21, 0x04);
+    scheduler_outb(0xa1, 0x02);
+    scheduler_outb(0x21, 0x01);
+    scheduler_outb(0xa1, 0x01);
+    scheduler_outb(0x21, 0xfe);
+    scheduler_outb(0xa1, 0xff);
+
+    ui16 divisor = (ui16)(pit_input_frequency / pit_frequency);
+    scheduler_outb(0x43, 0x36);
+    scheduler_outb(0x40, (ui8)divisor);
+    scheduler_outb(0x40, (ui8)(divisor >> 8));
+}
+
+} // namespace
 
 alignas(16) static ui8
     scheduler_task_stacks[scheduler_max_tasks][scheduler_stack_size];
@@ -36,6 +72,7 @@ static scheduler_task_t *scheduler_current_task_ptr() {
 }
 
 static void scheduler_task_trampoline() {
+    asm("sti");
     scheduler_task_t *task = scheduler_current_task_ptr();
     if (task == 0)
         halt();
@@ -73,6 +110,9 @@ void scheduler_init() {
         scheduler_tasks[index].active      = 0;
         scheduler_tasks[index].finished    = 0;
     }
+    scheduler_current_task = -1;
+    scheduler_task_count   = 0;
+    scheduler_timer_init();
 }
 
 int scheduler_create_task(scheduler_task_fn entry, void *arg) {
@@ -120,6 +160,7 @@ int scheduler_create_task(scheduler_task_fn entry, void *arg) {
 
 void scheduler_run() {
     while (true) {
+        asm("cli");
         int next_task = scheduler_find_next_task();
         if (next_task < 0)
             return;
@@ -133,7 +174,9 @@ void scheduler_yield() {
     scheduler_task_t *task = scheduler_current_task_ptr();
     if (task == 0 || task->finished)
         return;
+    asm("cli");
     scheduler_context_switch(&task->context, &scheduler_context);
+    asm("sti");
 }
 
 void scheduler_task_exit() {
@@ -144,4 +187,11 @@ void scheduler_task_exit() {
     task->finished = true;
     scheduler_context_switch(&task->context, &scheduler_context);
     halt();
+}
+
+extern "C" void scheduler_timer_interrupt() {
+    scheduler_outb(0x20, 0x20);
+    scheduler_task_t *task = scheduler_current_task_ptr();
+    if (task != 0 && !task->finished)
+        scheduler_context_switch(&task->context, &scheduler_context);
 }

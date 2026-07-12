@@ -207,3 +207,45 @@ x86_exception_stubs:
     .quad x86_exception_20, x86_exception_21, x86_exception_22, x86_exception_23
     .quad x86_exception_24, x86_exception_25, x86_exception_26, x86_exception_27
     .quad x86_exception_28, x86_exception_29, x86_exception_30, x86_exception_31
+
+.section .text
+.extern scheduler_timer_interrupt
+.global scheduler_timer_interrupt_stub
+.type scheduler_timer_interrupt_stub, @function
+scheduler_timer_interrupt_stub:
+    cld
+    push %rax
+    push %rbx
+    push %rcx
+    push %rdx
+    push %rsi
+    push %rdi
+    push %rbp
+    push %r8
+    push %r9
+    push %r10
+    push %r11
+    push %r12
+    push %r13
+    push %r14
+    push %r15
+    mov %rsp, %rbx
+    andq $-16, %rsp
+    call scheduler_timer_interrupt
+    mov %rbx, %rsp
+    pop %r15
+    pop %r14
+    pop %r13
+    pop %r12
+    pop %r11
+    pop %r10
+    pop %r9
+    pop %r8
+    pop %rbp
+    pop %rdi
+    pop %rsi
+    pop %rdx
+    pop %rcx
+    pop %rbx
+    pop %rax
+    iretq
