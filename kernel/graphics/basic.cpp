@@ -119,3 +119,10 @@ void graphics_move_cursor(i32 delta_x, i32 delta_y) {
         }
     }
 }
+
+void graphics_get_cursor_position(i32 *x, i32 *y) {
+    if (x != 0)
+        *x = cursor.x;
+    if (y != 0)
+        *y = cursor.y;
+}

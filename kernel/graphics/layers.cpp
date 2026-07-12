@@ -1,3 +1,4 @@
+#include <devices/ps2mouse.h>
 #include <graphics/basic.h>
 #include <graphics/colors.h>
 #include <graphics/layer.h>
@@ -15,7 +16,8 @@ void layer_manager_init() {
         layers[index].active = false;
 }
 
-layer_t *layer_create(i32 x, i32 y, ui32 width, ui32 height, i32 z_index) {
+layer_t *layer_create(i32 x, i32 y, ui32 width, ui32 height, i32 z_index,
+                      bool raise_on_click) {
     if (width == 0 || height == 0)
         return 0;
 
@@ -35,15 +37,16 @@ layer_t *layer_create(i32 x, i32 y, ui32 width, ui32 height, i32 z_index) {
     if (pixels == 0)
         return 0;
 
-    layer->pixels     = pixels;
-    layer->x          = x;
-    layer->y          = y;
-    layer->width      = width;
-    layer->height     = height;
-    layer->z_index    = z_index;
-    layer->page_count = page_count;
-    layer->visible    = true;
-    layer->active     = true;
+    layer->pixels         = pixels;
+    layer->x              = x;
+    layer->y              = y;
+    layer->width          = width;
+    layer->height         = height;
+    layer->z_index        = z_index;
+    layer->page_count     = page_count;
+    layer->visible        = true;
+    layer->active         = true;
+    layer->raise_on_click = raise_on_click;
     layer_clear(layer);
     return layer;
 }
@@ -134,9 +137,47 @@ void layer_compose() {
     }
 }
 
+static void raise_clicked_layer(i32 x, i32 y) {
+    layer_t *clicked_layer = 0;
+    layer_t *highest_layer = 0;
+    i32      clicked_z     = -2147483647 - 1;
+    i32      highest_z     = -2147483647 - 1;
+
+    for (int index = 0; index < layer_max_count; index++) {
+        layer_t &layer = layers[index];
+        if (!layer.active || !layer.visible)
+            continue;
+
+        if (layer.z_index > highest_z) {
+            highest_z     = layer.z_index;
+            highest_layer = &layer;
+        }
+
+        i32 local_x = x - layer.x;
+        i32 local_y = y - layer.y;
+        if (local_x < 0 || local_y < 0 ||
+            local_x >= static_cast<i32>(layer.width) ||
+            local_y >= static_cast<i32>(layer.height))
+            continue;
+
+        ui32 pixel =
+            layer.pixels[static_cast<ui64>(local_y) * layer.width + local_x];
+        if (pixel != layer_transparent && layer.z_index >= clicked_z) {
+            clicked_layer = &layer;
+            clicked_z     = layer.z_index;
+        }
+    }
+
+    if (clicked_layer != 0 && clicked_layer->raise_on_click &&
+        highest_layer != 0 && clicked_layer != highest_layer) {
+        highest_layer->z_index = clicked_layer->z_index;
+        clicked_layer->z_index = highest_z;
+    }
+}
+
 static void create_examples() {
     layer_t *desktop =
-        layer_create(0, 0, graphics_width(), graphics_height(), 0);
+        layer_create(0, 0, graphics_width(), graphics_height(), 0, false);
     layer_t *panel   = layer_create(0, 0, graphics_width(), 28, 10);
     layer_t *window1 = layer_create(70, 70, 300, 190, 20);
     layer_t *window2 = layer_create(250, 170, 320, 210, 30);
@@ -164,7 +205,16 @@ static void create_examples() {
 
 void layer_manager_main(void *) {
     create_examples();
+    bool was_left_button_down = false;
     while (true) {
+        ps2_mouse_state_t mouse = ps2mouse_get_state();
+        if (mouse.left_button && !was_left_button_down) {
+            i32 cursor_x;
+            i32 cursor_y;
+            graphics_get_cursor_position(&cursor_x, &cursor_y);
+            raise_clicked_layer(cursor_x, cursor_y);
+        }
+        was_left_button_down = mouse.left_button;
         layer_compose();
         scheduler_yield();
     }

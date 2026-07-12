@@ -49,5 +49,6 @@ typedef struct graphics_state {
 void graphics_init(const mb_info_t *mb_info);
 void draw_pixel(ui32 posx, ui32 posy, ui32 color);
 void graphics_move_cursor(i32 delta_x, i32 delta_y);
+void graphics_get_cursor_position(i32 *x, i32 *y);
 ui32 graphics_width();
 ui32 graphics_height();
