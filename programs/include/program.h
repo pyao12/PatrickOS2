@@ -23,4 +23,9 @@ struct program_api_t {
                       ui32 size);
     i64 (*rename_path)(const char *path, const char *new_path);
     i64 (*remove_path)(const char *path);
+    bool (*read_input)(char *character);
+    void (*clear_console)();
+    void (*erase_console_char)();
+    bool (*run_program)(const char *path, const char *argument,
+                        const char *cwd);
 };

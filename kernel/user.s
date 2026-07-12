@@ -28,10 +28,14 @@ x86_load_tables:
 
 .section .bss
 .align 8
+x86_user_depth:
+    .quad 0
 x86_kernel_rsp:
-    .quad 0
+    .skip 64
 x86_kernel_cr3:
-    .quad 0
+    .skip 64
+x86_kernel_rsp0:
+    .skip 64
 
 .section .text
 .global x86_enter_user_asm
@@ -43,9 +47,14 @@ x86_enter_user_asm:
     push %r13
     push %r14
     push %r15
-    mov %rsp, x86_kernel_rsp(%rip)
+    mov x86_user_depth(%rip), %r8
+    mov %rsp, x86_kernel_rsp(,%r8,8)
     mov %cr3, %rax
-    mov %rax, x86_kernel_cr3(%rip)
+    mov %rax, x86_kernel_cr3(,%r8,8)
+    mov x86_tss+4(%rip), %rax
+    mov %rax, x86_kernel_rsp0(,%r8,8)
+    inc %r8
+    mov %r8, x86_user_depth(%rip)
     mov %rsp, x86_tss+4(%rip)
     mov %rcx, %cr3
     pushq $USER_DATA_SEL
@@ -61,9 +70,14 @@ x86_enter_user_asm:
 .type x86_leave_user_asm, @function
 x86_leave_user_asm:
     movzbl %dil, %eax
-    mov x86_kernel_cr3(%rip), %rcx
+    mov x86_user_depth(%rip), %r8
+    dec %r8
+    mov %r8, x86_user_depth(%rip)
+    mov x86_kernel_cr3(,%r8,8), %rcx
     mov %rcx, %cr3
-    mov x86_kernel_rsp(%rip), %rsp
+    mov x86_kernel_rsp(,%r8,8), %rsp
+    mov x86_kernel_rsp0(,%r8,8), %rcx
+    mov %rcx, x86_tss+4(%rip)
     pop %r15
     pop %r14
     pop %r13

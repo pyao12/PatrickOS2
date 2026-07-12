@@ -1,5 +1,6 @@
 #include <console.h>
 #include <fs/fat32.h>
+#include <input.h>
 #include <memory.h>
 #include <program.h>
 #include <scheduler.h>
@@ -43,6 +44,10 @@ constexpr ui64 syscall_create_directory = 6;
 constexpr ui64 syscall_write_file       = 7;
 constexpr ui64 syscall_rename_path      = 8;
 constexpr ui64 syscall_remove_path      = 9;
+constexpr ui64 syscall_read_input       = 10;
+constexpr ui64 syscall_clear_console    = 11;
+constexpr ui64 syscall_erase_console    = 12;
+constexpr ui64 syscall_run_program      = 13;
 constexpr ui64 syscall_result_exit      = 0x100;
 constexpr ui64 syscall_result_failure   = 0x101;
 constexpr ui64 max_syscall_text         = 1024;
@@ -272,6 +277,35 @@ extern "C" ui64 program_syscall(ui64 number, ui64 argument1, ui64 argument2,
         write_console(text, (ui32)argument2);
         return 0;
     }
+    if (number == syscall_read_input) {
+        if (!user_range_mapped(active_program, argument1, 1))
+            return syscall_result_failure;
+        return input_buffer_pop(&global_input_buffer, (char *)(uip)argument1);
+    }
+    if (number == syscall_clear_console) {
+        clear_console();
+        return 0;
+    }
+    if (number == syscall_erase_console) {
+        erase_console_char();
+        return 0;
+    }
+    if (number == syscall_run_program) {
+        char program_path[max_syscall_path];
+        char program_argument[max_syscall_path];
+        char program_cwd[max_syscall_path];
+        if (!copy_user_string((const char *)(uip)argument1, program_path,
+                              sizeof(program_path)) ||
+            !copy_user_string((const char *)(uip)argument2, program_argument,
+                              sizeof(program_argument)) ||
+            !copy_user_string((const char *)(uip)argument3, program_cwd,
+                              sizeof(program_cwd)))
+            return syscall_result_failure;
+        program_address_space_t *parent = active_program;
+        bool success = program_run(program_path, program_argument, program_cwd);
+        active_program = parent;
+        return success;
+    }
 
     char path[max_syscall_path];
     if ((number != syscall_read_file && number != syscall_list_directory &&
@@ -500,6 +534,10 @@ bool program_run(const char *path, const char *argument, const char *cwd) {
     constexpr ui64 rename_path_stub_offset      = 624;
     constexpr ui64 remove_path_stub_offset      = 640;
     constexpr ui64 exit_stub_offset             = 656;
+    constexpr ui64 read_input_stub_offset       = 672;
+    constexpr ui64 clear_console_stub_offset    = 688;
+    constexpr ui64 erase_console_stub_offset    = 704;
+    constexpr ui64 run_program_stub_offset      = 720;
     constexpr ui64 argument_offset              = 128;
     constexpr ui64 cwd_offset                   = 384;
     program_api_t *api                          = (program_api_t *)program.api;
@@ -521,17 +559,29 @@ bool program_run(const char *path, const char *argument, const char *cwd) {
         uip)(user_api_address + write_file_stub_offset);
     api->rename_path = (i64 (*)(const char *, const char *))(
         uip)(user_api_address + rename_path_stub_offset);
-    api->remove_path           = (i64 (*)(const char *))(uip)(user_api_address +
+    api->remove_path = (i64 (*)(const char *))(uip)(user_api_address +
                                                     remove_path_stub_offset);
-    const ui8 write_stub[]     = {0xb8, 1, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 yield_stub[]     = {0xb8, 2, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 read_file_stub[] = {0xb8, 3, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    api->read_input =
+        (bool (*)(char *))(uip)(user_api_address + read_input_stub_offset);
+    api->clear_console =
+        (void (*)())(uip)(user_api_address + clear_console_stub_offset);
+    api->erase_console_char =
+        (void (*)())(uip)(user_api_address + erase_console_stub_offset);
+    api->run_program = (bool (*)(const char *, const char *, const char *))(
+        uip)(user_api_address + run_program_stub_offset);
+    const ui8 write_stub[]            = {0xb8, 1, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 yield_stub[]            = {0xb8, 2, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 read_file_stub[]        = {0xb8, 3, 0, 0, 0, 0xcd, 0x80, 0xc3};
     const ui8 list_directory_stub[]   = {0xb8, 4, 0, 0, 0, 0xcd, 0x80, 0xc3};
     const ui8 create_file_stub[]      = {0xb8, 5, 0, 0, 0, 0xcd, 0x80, 0xc3};
     const ui8 create_directory_stub[] = {0xb8, 6, 0, 0, 0, 0xcd, 0x80, 0xc3};
     const ui8 write_file_stub[]       = {0xb8, 7, 0, 0, 0, 0xcd, 0x80, 0xc3};
     const ui8 rename_path_stub[]      = {0xb8, 8, 0, 0, 0, 0xcd, 0x80, 0xc3};
     const ui8 remove_path_stub[]      = {0xb8, 9, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 read_input_stub[]       = {0xb8, 10, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 clear_console_stub[]    = {0xb8, 11, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 erase_console_stub[]    = {0xb8, 12, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 run_program_stub[]      = {0xb8, 13, 0, 0, 0, 0xcd, 0x80, 0xc3};
     const ui8 exit_stub[]             = {0x31, 0xc0, 0xcd, 0x80, 0xf4};
     for (ui64 index = 0; index < sizeof(write_stub); index++)
         program.api[write_stub_offset + index] = write_stub[index];
@@ -553,6 +603,16 @@ bool program_run(const char *path, const char *argument, const char *cwd) {
         program.api[rename_path_stub_offset + index] = rename_path_stub[index];
     for (ui64 index = 0; index < sizeof(remove_path_stub); index++)
         program.api[remove_path_stub_offset + index] = remove_path_stub[index];
+    for (ui64 index = 0; index < sizeof(read_input_stub); index++)
+        program.api[read_input_stub_offset + index] = read_input_stub[index];
+    for (ui64 index = 0; index < sizeof(clear_console_stub); index++)
+        program.api[clear_console_stub_offset + index] =
+            clear_console_stub[index];
+    for (ui64 index = 0; index < sizeof(erase_console_stub); index++)
+        program.api[erase_console_stub_offset + index] =
+            erase_console_stub[index];
+    for (ui64 index = 0; index < sizeof(run_program_stub); index++)
+        program.api[run_program_stub_offset + index] = run_program_stub[index];
     for (ui64 index = 0; index < sizeof(exit_stub); index++)
         program.api[exit_stub_offset + index] = exit_stub[index];
     for (ui64 index = 0; argument != 0 && argument[index] != 0 &&

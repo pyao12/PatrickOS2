@@ -7,8 +7,14 @@
 #include <graphics/basic.h>
 #include <input.h>
 #include <memory.h>
+#include <program.h>
 #include <scheduler.h>
 #include <x86.h>
+
+static void console_program_main(void *) {
+    if (!program_run("/programs/console.elf"))
+        halt();
+}
 
 extern "C" void kernel_main(ui32 mb_info_addr) {
     serial_init();
@@ -33,7 +39,7 @@ extern "C" void kernel_main(ui32 mb_info_addr) {
     serial_write_str("Initializing scheduler...\n");
     scheduler_init();
 
-    if (scheduler_create_task(console_main, 0) < 0)
+    if (scheduler_create_task(console_program_main, 0) < 0)
         halt();
     if (scheduler_create_task(keyboard_main, 0) < 0)
         halt();
