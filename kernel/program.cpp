@@ -1,5 +1,6 @@
 #include <console.h>
 #include <fs/fat32.h>
+#include <graphics/layer.h>
 #include <input.h>
 #include <memory.h>
 #include <program.h>
@@ -38,22 +39,31 @@ constexpr ui64 syscall_exit       = 0;
 constexpr ui64 syscall_write      = 1;
 constexpr ui64 syscall_yield      = 2;
 constexpr ui64 syscall_read_file  = 3;
-constexpr ui64 syscall_list_directory   = 4;
-constexpr ui64 syscall_create_file      = 5;
-constexpr ui64 syscall_create_directory = 6;
-constexpr ui64 syscall_write_file       = 7;
-constexpr ui64 syscall_rename_path      = 8;
-constexpr ui64 syscall_remove_path      = 9;
-constexpr ui64 syscall_read_input       = 10;
-constexpr ui64 syscall_clear_console    = 11;
-constexpr ui64 syscall_erase_console    = 12;
-constexpr ui64 syscall_run_program      = 13;
-constexpr ui64 syscall_result_exit      = 0x100;
-constexpr ui64 syscall_result_failure   = 0x101;
-constexpr ui64 max_syscall_text         = 1024;
-constexpr ui64 max_syscall_path         = 256;
-constexpr ui64 max_syscall_io           = 4096;
-constexpr ui64 max_page_tables          = 16;
+constexpr ui64 syscall_list_directory     = 4;
+constexpr ui64 syscall_create_file        = 5;
+constexpr ui64 syscall_create_directory   = 6;
+constexpr ui64 syscall_write_file         = 7;
+constexpr ui64 syscall_rename_path        = 8;
+constexpr ui64 syscall_remove_path        = 9;
+constexpr ui64 syscall_read_input         = 10;
+constexpr ui64 syscall_clear_console      = 11;
+constexpr ui64 syscall_erase_console      = 12;
+constexpr ui64 syscall_run_program        = 13;
+constexpr ui64 syscall_layer_create       = 14;
+constexpr ui64 syscall_layer_destroy      = 15;
+constexpr ui64 syscall_layer_set_position = 16;
+constexpr ui64 syscall_layer_set_visible  = 17;
+constexpr ui64 syscall_layer_set_z_index  = 18;
+constexpr ui64 syscall_layer_clear        = 19;
+constexpr ui64 syscall_layer_fill         = 20;
+constexpr ui64 syscall_layer_draw_pixel   = 21;
+constexpr ui64 syscall_layer_fill_rect    = 22;
+constexpr ui64 syscall_result_exit        = 0x100;
+constexpr ui64 syscall_result_failure     = 0x101;
+constexpr ui64 max_syscall_text           = 1024;
+constexpr ui64 max_syscall_path           = 256;
+constexpr ui64 max_syscall_io             = 4096;
+constexpr ui64 max_page_tables            = 16;
 
 struct elf64_header_t {
     ui8  ident[16];
@@ -89,13 +99,14 @@ struct elf64_dynamic_t {
 } __attribute__((packed));
 
 struct program_address_space_t {
-    ui64 *pml4;
-    ui8  *image;
-    ui64  image_pages;
-    ui8  *stack;
-    ui8  *api;
-    void *page_tables[max_page_tables];
-    ui64  page_table_count;
+    ui64    *pml4;
+    ui8     *image;
+    ui64     image_pages;
+    ui8     *stack;
+    ui8     *api;
+    void    *page_tables[max_page_tables];
+    ui64     page_table_count;
+    layer_t *layers[layer_max_count];
 };
 
 program_address_space_t *active_program = 0;
@@ -243,6 +254,10 @@ bool copy_user_string(const char *user_text, char *text, ui64 capacity) {
 }
 
 void destroy_address_space(program_address_space_t *program) {
+    for (ui64 index = 0; index < layer_max_count; index++) {
+        if (program->layers[index] != 0)
+            layer_destroy(program->layers[index]);
+    }
     for (ui64 index = 0; index < program->page_table_count; index++) {
         memory_free_pages(program->page_tables[index], 1);
     }
@@ -254,6 +269,12 @@ void destroy_address_space(program_address_space_t *program) {
         memory_free_pages(program->stack, 2);
     if (program->image != 0)
         memory_free_pages(program->image, program->image_pages);
+}
+
+layer_t *program_layer(program_layer_t handle) {
+    if (handle == program_layer_invalid || handle > layer_max_count)
+        return 0;
+    return active_program->layers[handle - 1];
 }
 
 } // namespace
@@ -305,6 +326,61 @@ extern "C" ui64 program_syscall(ui64 number, ui64 argument1, ui64 argument2,
         bool success = program_run(program_path, program_argument, program_cwd);
         active_program = parent;
         return success;
+    }
+    if (number == syscall_layer_create) {
+        if (!user_range_mapped(active_program, argument1,
+                               sizeof(program_layer_create_t)))
+            return program_layer_invalid;
+        const program_layer_create_t &properties =
+            *(const program_layer_create_t *)(uip)argument1;
+        for (ui64 index = 0; index < layer_max_count; index++) {
+            if (active_program->layers[index] != 0)
+                continue;
+            layer_t *layer = layer_create(
+                properties.x, properties.y, properties.width, properties.height,
+                properties.z_index, properties.raise_on_click);
+            if (layer == 0)
+                return program_layer_invalid;
+            active_program->layers[index] = layer;
+            return index + 1;
+        }
+        return program_layer_invalid;
+    }
+    if (number >= syscall_layer_destroy && number <= syscall_layer_draw_pixel) {
+        layer_t *layer = program_layer((program_layer_t)argument1);
+        if (layer == 0)
+            return syscall_result_failure;
+        if (number == syscall_layer_destroy) {
+            layer_destroy(layer);
+            active_program->layers[argument1 - 1] = 0;
+        } else if (number == syscall_layer_set_position) {
+            layer_set_position(layer, (i32)argument2, (i32)argument3);
+        } else if (number == syscall_layer_set_visible) {
+            layer_set_visible(layer, argument2 != 0);
+        } else if (number == syscall_layer_set_z_index) {
+            layer_set_z_index(layer, (i32)argument2);
+        } else if (number == syscall_layer_clear) {
+            layer_clear(layer);
+        } else if (number == syscall_layer_fill) {
+            layer_fill(layer, (ui32)argument2);
+        } else {
+            layer_draw_pixel(layer, (i32)argument2, (i32)argument3,
+                             (ui32)argument4);
+        }
+        return 0;
+    }
+    if (number == syscall_layer_fill_rect) {
+        if (!user_range_mapped(active_program, argument1,
+                               sizeof(program_layer_rect_t)))
+            return syscall_result_failure;
+        const program_layer_rect_t &rect =
+            *(const program_layer_rect_t *)(uip)argument1;
+        layer_t *layer = program_layer(rect.layer);
+        if (layer == 0)
+            return syscall_result_failure;
+        layer_fill_rect(layer, rect.x, rect.y, rect.width, rect.height,
+                        rect.color);
+        return 0;
     }
 
     char path[max_syscall_path];
@@ -464,12 +540,14 @@ bool program_run(const char *path, const char *argument, const char *cwd) {
     program.stack            = 0;
     program.api              = 0;
     program.page_table_count = 0;
-    ui64 image_size          = highest_address - lowest_address;
-    program.image_pages      = image_size / page_size;
-    program.image            = (ui8 *)memory_alloc_pages(program.image_pages);
-    program.stack            = (ui8 *)memory_alloc_pages(2);
-    program.api              = (ui8 *)memory_alloc_pages(1);
-    program.pml4             = (ui64 *)memory_alloc_pages(1);
+    for (ui64 index = 0; index < layer_max_count; index++)
+        program.layers[index] = 0;
+    ui64 image_size     = highest_address - lowest_address;
+    program.image_pages = image_size / page_size;
+    program.image       = (ui8 *)memory_alloc_pages(program.image_pages);
+    program.stack       = (ui8 *)memory_alloc_pages(2);
+    program.api         = (ui8 *)memory_alloc_pages(1);
+    program.pml4        = (ui64 *)memory_alloc_pages(1);
     if (program.image == 0 || program.stack == 0 || program.api == 0 ||
         program.pml4 == 0) {
         destroy_address_space(&program);
@@ -524,23 +602,32 @@ bool program_run(const char *path, const char *argument, const char *cwd) {
         }
     }
 
-    constexpr ui64 write_stub_offset            = 512;
-    constexpr ui64 yield_stub_offset            = 528;
-    constexpr ui64 read_file_stub_offset        = 544;
-    constexpr ui64 list_directory_stub_offset   = 560;
-    constexpr ui64 create_file_stub_offset      = 576;
-    constexpr ui64 create_directory_stub_offset = 592;
-    constexpr ui64 write_file_stub_offset       = 608;
-    constexpr ui64 rename_path_stub_offset      = 624;
-    constexpr ui64 remove_path_stub_offset      = 640;
-    constexpr ui64 exit_stub_offset             = 656;
-    constexpr ui64 read_input_stub_offset       = 672;
-    constexpr ui64 clear_console_stub_offset    = 688;
-    constexpr ui64 erase_console_stub_offset    = 704;
-    constexpr ui64 run_program_stub_offset      = 720;
-    constexpr ui64 argument_offset              = 128;
-    constexpr ui64 cwd_offset                   = 384;
-    program_api_t *api                          = (program_api_t *)program.api;
+    constexpr ui64 write_stub_offset              = 512;
+    constexpr ui64 yield_stub_offset              = 528;
+    constexpr ui64 read_file_stub_offset          = 544;
+    constexpr ui64 list_directory_stub_offset     = 560;
+    constexpr ui64 create_file_stub_offset        = 576;
+    constexpr ui64 create_directory_stub_offset   = 592;
+    constexpr ui64 write_file_stub_offset         = 608;
+    constexpr ui64 rename_path_stub_offset        = 624;
+    constexpr ui64 remove_path_stub_offset        = 640;
+    constexpr ui64 exit_stub_offset               = 656;
+    constexpr ui64 read_input_stub_offset         = 672;
+    constexpr ui64 clear_console_stub_offset      = 688;
+    constexpr ui64 erase_console_stub_offset      = 704;
+    constexpr ui64 run_program_stub_offset        = 720;
+    constexpr ui64 layer_create_stub_offset       = 736;
+    constexpr ui64 layer_destroy_stub_offset      = 752;
+    constexpr ui64 layer_set_position_stub_offset = 768;
+    constexpr ui64 layer_set_visible_stub_offset  = 784;
+    constexpr ui64 layer_set_z_index_stub_offset  = 800;
+    constexpr ui64 layer_clear_stub_offset        = 816;
+    constexpr ui64 layer_fill_stub_offset         = 832;
+    constexpr ui64 layer_draw_pixel_stub_offset   = 848;
+    constexpr ui64 layer_fill_rect_stub_offset    = 864;
+    constexpr ui64 argument_offset                = 128;
+    constexpr ui64 cwd_offset                     = 384;
+    program_api_t *api = (program_api_t *)program.api;
     api->write_console = (void (*)(const char *, ui32))(uip)(user_api_address +
                                                              write_stub_offset);
     api->yield     = (void (*)())(uip)(user_api_address + yield_stub_offset);
@@ -569,20 +656,47 @@ bool program_run(const char *path, const char *argument, const char *cwd) {
         (void (*)())(uip)(user_api_address + erase_console_stub_offset);
     api->run_program = (bool (*)(const char *, const char *, const char *))(
         uip)(user_api_address + run_program_stub_offset);
-    const ui8 write_stub[]            = {0xb8, 1, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 yield_stub[]            = {0xb8, 2, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 read_file_stub[]        = {0xb8, 3, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 list_directory_stub[]   = {0xb8, 4, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 create_file_stub[]      = {0xb8, 5, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 create_directory_stub[] = {0xb8, 6, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 write_file_stub[]       = {0xb8, 7, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 rename_path_stub[]      = {0xb8, 8, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 remove_path_stub[]      = {0xb8, 9, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 read_input_stub[]       = {0xb8, 10, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 clear_console_stub[]    = {0xb8, 11, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 erase_console_stub[]    = {0xb8, 12, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 run_program_stub[]      = {0xb8, 13, 0, 0, 0, 0xcd, 0x80, 0xc3};
-    const ui8 exit_stub[]             = {0x31, 0xc0, 0xcd, 0x80, 0xf4};
+    api->layer_create = (program_layer_t (*)(const program_layer_create_t *))(
+        uip)(user_api_address + layer_create_stub_offset);
+    api->layer_destroy = (void (*)(program_layer_t))(
+        uip)(user_api_address + layer_destroy_stub_offset);
+    api->layer_set_position = (void (*)(program_layer_t, i32, i32))(
+        uip)(user_api_address + layer_set_position_stub_offset);
+    api->layer_set_visible = (void (*)(program_layer_t, bool))(
+        uip)(user_api_address + layer_set_visible_stub_offset);
+    api->layer_set_z_index = (void (*)(program_layer_t, i32))(
+        uip)(user_api_address + layer_set_z_index_stub_offset);
+    api->layer_clear = (void (*)(program_layer_t))(
+        uip)(user_api_address + layer_clear_stub_offset);
+    api->layer_fill = (void (*)(program_layer_t, ui32))(
+        uip)(user_api_address + layer_fill_stub_offset);
+    api->layer_draw_pixel = (void (*)(program_layer_t, i32, i32, ui32))(
+        uip)(user_api_address + layer_draw_pixel_stub_offset);
+    api->layer_fill_rect = (void (*)(const program_layer_rect_t *))(
+        uip)(user_api_address + layer_fill_rect_stub_offset);
+    const ui8 write_stub[]              = {0xb8, 1, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 yield_stub[]              = {0xb8, 2, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 read_file_stub[]          = {0xb8, 3, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 list_directory_stub[]     = {0xb8, 4, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 create_file_stub[]        = {0xb8, 5, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 create_directory_stub[]   = {0xb8, 6, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 write_file_stub[]         = {0xb8, 7, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 rename_path_stub[]        = {0xb8, 8, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 remove_path_stub[]        = {0xb8, 9, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 read_input_stub[]         = {0xb8, 10, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 clear_console_stub[]      = {0xb8, 11, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 erase_console_stub[]      = {0xb8, 12, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 run_program_stub[]        = {0xb8, 13, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 layer_create_stub[]       = {0xb8, 14, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 layer_destroy_stub[]      = {0xb8, 15, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 layer_set_position_stub[] = {0xb8, 16, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 layer_set_visible_stub[]  = {0xb8, 17, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 layer_set_z_index_stub[]  = {0xb8, 18, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 layer_clear_stub[]        = {0xb8, 19, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 layer_fill_stub[]         = {0xb8, 20, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 layer_draw_pixel_stub[]   = {0xb8, 21, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 layer_fill_rect_stub[]    = {0xb8, 22, 0, 0, 0, 0xcd, 0x80, 0xc3};
+    const ui8 exit_stub[]               = {0x31, 0xc0, 0xcd, 0x80, 0xf4};
     for (ui64 index = 0; index < sizeof(write_stub); index++)
         program.api[write_stub_offset + index] = write_stub[index];
     for (ui64 index = 0; index < sizeof(yield_stub); index++)
@@ -613,6 +727,31 @@ bool program_run(const char *path, const char *argument, const char *cwd) {
             erase_console_stub[index];
     for (ui64 index = 0; index < sizeof(run_program_stub); index++)
         program.api[run_program_stub_offset + index] = run_program_stub[index];
+    for (ui64 index = 0; index < sizeof(layer_create_stub); index++)
+        program.api[layer_create_stub_offset + index] =
+            layer_create_stub[index];
+    for (ui64 index = 0; index < sizeof(layer_destroy_stub); index++)
+        program.api[layer_destroy_stub_offset + index] =
+            layer_destroy_stub[index];
+    for (ui64 index = 0; index < sizeof(layer_set_position_stub); index++)
+        program.api[layer_set_position_stub_offset + index] =
+            layer_set_position_stub[index];
+    for (ui64 index = 0; index < sizeof(layer_set_visible_stub); index++)
+        program.api[layer_set_visible_stub_offset + index] =
+            layer_set_visible_stub[index];
+    for (ui64 index = 0; index < sizeof(layer_set_z_index_stub); index++)
+        program.api[layer_set_z_index_stub_offset + index] =
+            layer_set_z_index_stub[index];
+    for (ui64 index = 0; index < sizeof(layer_clear_stub); index++)
+        program.api[layer_clear_stub_offset + index] = layer_clear_stub[index];
+    for (ui64 index = 0; index < sizeof(layer_fill_stub); index++)
+        program.api[layer_fill_stub_offset + index] = layer_fill_stub[index];
+    for (ui64 index = 0; index < sizeof(layer_draw_pixel_stub); index++)
+        program.api[layer_draw_pixel_stub_offset + index] =
+            layer_draw_pixel_stub[index];
+    for (ui64 index = 0; index < sizeof(layer_fill_rect_stub); index++)
+        program.api[layer_fill_rect_stub_offset + index] =
+            layer_fill_rect_stub[index];
     for (ui64 index = 0; index < sizeof(exit_stub); index++)
         program.api[exit_stub_offset + index] = exit_stub[index];
     for (ui64 index = 0; argument != 0 && argument[index] != 0 &&
