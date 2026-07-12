@@ -1,5 +1,6 @@
 #include <graphics/basic.h>
 #include <graphics/font.h>
+#include <graphics/layer.h>
 
 void print_char(char c, ui32 posx, ui32 posy, ui32 color) {
     int index_begin = c * 16 + 1;
@@ -11,6 +12,19 @@ void print_char(char c, ui32 posx, ui32 posy, ui32 color) {
             } else {
                 draw_pixel(posx + 8 - col, posy + row, 0);
             }
+        }
+    }
+}
+
+void print_char(layer_t *layer, char c, ui32 posx, ui32 posy, ui32 color) {
+    int index_begin = c * 16 + 1;
+
+    for (int row = 0; row < 16; row++) {
+        for (int col = 0; col < 8; col++) {
+            ui32 pixel = font_ASC16[row + index_begin] & (1 << col)
+                             ? color
+                             : COLOR_BLACK;
+            layer_draw_pixel(layer, posx + 8 - col, posy + row, pixel);
         }
     }
 }

@@ -78,6 +78,10 @@ void draw_pixel(ui32 posx, ui32 posy, ui32 color) {
     write_pixel(x, y, color);
 }
 
+ui32 graphics_width() { return g_graphics.width; }
+
+ui32 graphics_height() { return g_graphics.height; }
+
 void graphics_move_cursor(i32 delta_x, i32 delta_y) {
     if (cursor.visible) {
         for (ui32 y = 0; y < cursor_height; y++) {

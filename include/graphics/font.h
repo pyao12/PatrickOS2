@@ -5,5 +5,8 @@
 #include "__fontdat.h"
 #include <common.h>
 
+struct layer_t;
+
 void print_char(char c, ui32 posx, ui32 posy, ui32 color);
+void print_char(layer_t *layer, char c, ui32 posx, ui32 posy, ui32 color);
 void print_str(const char *str, ui32 posx, ui32 posy, ui32 color);

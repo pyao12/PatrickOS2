@@ -5,6 +5,7 @@
 #include <devices/serial.h>
 #include <fs/fat32.h>
 #include <graphics/basic.h>
+#include <graphics/layer.h>
 #include <input.h>
 #include <memory.h>
 #include <program.h>
@@ -26,6 +27,7 @@ extern "C" void kernel_main(ui32 mb_info_addr) {
 
     serial_write_str("Initializing memory manager...\n");
     memory_init(mb_info);
+    layer_manager_init();
 
     serial_write_str("Initializing x86...\n");
     x86_init();
@@ -40,6 +42,8 @@ extern "C" void kernel_main(ui32 mb_info_addr) {
     scheduler_init();
 
     if (scheduler_create_task(console_program_main, 0) < 0)
+        halt();
+    if (scheduler_create_task(layer_manager_main, 0) < 0)
         halt();
     if (scheduler_create_task(keyboard_main, 0) < 0)
         halt();
